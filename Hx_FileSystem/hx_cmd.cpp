@@ -1568,13 +1568,13 @@ void h_link(char filename[])
 			str2stack(s);
 			findtreeinode(s, L_Ftree, p4);     //根据路径找到对应节点
 			if (p4 == NULL) printf("输入文件不存在！请检查！\n");
-			if (file_inode[p2->data.dir_inode].file_length>0)  //该文件原来有内容则删除
+			if (file_inode[p2->data.dir_inode].file_length>0)  //delete file content
 			{
 				free_disk(p2->data.dir_inode);
 			}
-			file_inode[p2->data.dir_inode].inode_number = -1; //原来inode删除
-			p2->data.dir_inode = p4->data.dir_inode;         //赋予新的inode
-			file_inode[p4->data.dir_inode].file_icount++;  //硬链接加一
+			file_inode[p2->data.dir_inode].inode_number = -1; //delete inode
+			p2->data.dir_inode = p4->data.dir_inode;         //new inode
+			file_inode[p4->data.dir_inode].file_icount++;  //hard link count add 1
 		}
 		else printf("您不具备权限，请联系管理员修改权限！（chmod + 文件名）\n");
 
@@ -1687,7 +1687,6 @@ void file2str(int a, char buff[], int n)   //a为inode号，buff为文件内容存放数组
 		}
 		f1[0] = atoi(b1);f1[1] = atoi(b_2);
 
-		//二次间接寻址
 		int f2[4];
 		char b2[4][5];
 		for (int j = 0;j<5;j++)
@@ -1702,7 +1701,6 @@ void file2str(int a, char buff[], int n)   //a为inode号，buff为文件内容存放数组
 			f2[i] = atoi(b2[i]);
 		}
 
-		//三次间接寻址
 		int f3[8], j;
 		char b3[8][5];
 		for (j = 0;j<5;j++)
@@ -1733,7 +1731,8 @@ void file2str(int a, char buff[], int n)   //a为inode号，buff为文件内容存放数组
 	}
 }
 
-void do_file(char buff[])  //执行数组中的文件
+//do file in array
+void do_file(char buff[])
 {
 	SqStack s;
 	InitStack(s);
@@ -1778,9 +1777,8 @@ void s_link(char filename[])
 		{
 			if ((strcmp(p->data.file_name, filename) == 0) && (file_inode[p->data.dir_inode].file_style == 1))
 			{
-				//关闭文件操作，用户表，系统登记表和活动inode表都要操作
 				a = p->data.dir_inode;
-				if (cur_user.userid == file_inode[a].file_userid)     //属主
+				if (cur_user.userid == file_inode[a].file_userid) 
 				{
 					if (file_inode[a].file_mode[0] == 1)
 					{
@@ -1792,7 +1790,7 @@ void s_link(char filename[])
 					}
 					else printf("您不具备权限，请联系管理员修改权限！（chmod + 文件名）\n");
 				}
-				else if (cur_user.group == file_inode[a].file_groupid)   //同组
+				else if (cur_user.group == file_inode[a].file_groupid)
 				{
 					if (file_inode[a].file_mode[3] == 1)
 					{
@@ -1817,7 +1815,7 @@ void s_link(char filename[])
 	}
 }
 
-//重命名函数
+//rename
 void rename(char filename[])
 {
 
@@ -1826,29 +1824,28 @@ void rename(char filename[])
 	path_tnode(cur_dir, L_Ftree, p);
 	if (p->lchild == NULL)      //为空
 	{
-		printf("不存在该文件！\n");
+		printf("File not existed\n");
 	}
-	else   //非空
+	else
 	{
 		p2 = p->lchild;
 		while (p2 != NULL)
 		{
 			if ((strcmp(p2->data.file_name, filename) == 0) && (file_inode[p2->data.dir_inode].file_style == 1))  //存在同名文件
 			{
-				printf("请输入新文件名:");
+				printf("Please input a new file name:");
 				scanf("%s", newfname);
-				if (strcmp(newfname, filename) == 0) { printf("请不要输入原来的名字^-^!\n");return; }
+				if (strcmp(newfname, filename) == 0) { printf("Please do not input the same name^-^!\n");return; }
 				p3 = p->lchild;
 				while (p3 != NULL)
 				{
 					if ((strcmp(p3->data.file_name, newfname) == 0) && (file_inode[p3->data.dir_inode].file_style == 1))  //存在同名文件
 					{
-						printf("该名字已经被用过了哦^-^!\n");return;
+						printf("This name has already used^-^!\n");return;
 					}
 					p3 = p3->rchild;
 				}
 				strcpy(p2->data.file_name, newfname);
-				//改变当前路径
 				return;
 			}
 			p2 = p2->rchild;
@@ -1860,4 +1857,3 @@ void rename(char filename[])
 	FILE *fp;
 	WriteToFile(fp);
 }
-
