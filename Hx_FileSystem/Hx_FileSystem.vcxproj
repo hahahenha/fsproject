@@ -62,7 +62,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="expections.h" />
     <ClInclude Include="head.h" />
+    <ClInclude Include="settings.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="hx_cmd.cpp" />

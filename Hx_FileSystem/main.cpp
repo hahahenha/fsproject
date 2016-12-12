@@ -31,7 +31,7 @@ SystemOpenTable sys_open_table[200];	//system open table
 ActiveNode active_inode_table;			//active inode table
 
 
-char buffer[13312];			    //file content buffer
+char buffer[260];			    //file content buffer
 int	address_buffer[1000];       //file address buffer
 
 FTreepoint L_Ftree;				//file tree

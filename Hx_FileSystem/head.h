@@ -13,6 +13,10 @@
 #include <math.h>
 #include <fstream>
 #include <conio.h> 
+
+#include "settings.h"
+#include "expections.h"
+
 using namespace std;
 
 /**
@@ -113,7 +117,7 @@ typedef struct user_opentable{
 /**
 *	Active inode
 */
-typedef struct active_node{
+typedef struct{
 	inode activeinode[200];	//inode table
 } ActiveNode;
 

@@ -8,8 +8,6 @@
 */
 #include "head.h"
 
-#include "head.h"
-
 //Global variable
 extern usernote cur_user;			//current user
 extern SqStack cur_dir;     		//current directory
