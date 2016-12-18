@@ -7,3 +7,25 @@
 *
 */
 #pragma once
+
+#define E1 "The system open table is full!\n"
+#define E2 "You can't open more files at the same time!\n"
+#define E3 "Inode has already run out!\n"
+#define E4 "Acitve inode table is full!\n"
+#define E5 "The file isn't in active inode table!\n"
+#define E6 "The file isn't in system open file!\n"
+#define E7 "The file isn't in user open table!\n"
+#define E8 "The directory doesn't exist\n"
+#define E9 "Already at root dir!\n"
+#define E10 "Already exist a same name dir! Create failed!\n"
+#define E11 "Input dirname error! Please check out!\n"
+#define E12 "Access Denied! (chmod + filename)\n"
+#define E13 "The file has already opened, please close it before delete!\n"
+#define E14 "File not exist!\n"
+#define E15 "User not exist!\n"
+#define E16 "Password error!\n"
+#define E17 "Login failed!\n"
+#define E18 "You are not the owner of the file!\n"
+#define E19 "Access Denied!\n"
+#define E20 "Input file name error! Please check out!\n"
+#define E21 "Input error!\nTry help to get full information\n"

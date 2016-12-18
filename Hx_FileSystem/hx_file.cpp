@@ -11,17 +11,17 @@
 //Global variable
 extern usernote cur_user;			//current user
 extern SqStack cur_dir;     		//current directory
-extern Sys_cmd cmd[25];				//23 commands
-extern usernote L_user[10];			//users array
+extern Sys_cmd cmd[COM_NUM];				//23 commands
+extern usernote L_user[USER_COUNT];			//users array
 extern int f_inode;					//current active inode number
 
 extern super_block hx_superblock;   //super block
-extern inode file_inode[512];		//inode
-extern dir file_dir[512];			//directory
-extern physicalBlock phy[20500];	//data
+extern inode file_inode[INODES_COUNT];		//inode
+extern dir file_dir[DIR_COUNT];			//directory
+extern physicalBlock phy[PHY_DATA_SIZE];	//data
 
-extern  UserOpenTable user_open_table[10];	//user open table
-extern SystemOpenTable sys_open_table[200];	//system open table
+extern  UserOpenTable user_open_table[USER_ALLOW_OPEN_COUNT];	//user open table
+extern SystemOpenTable sys_open_table[SYSTEM_ALLOW_OPEN_COUNT];	//system open table
 extern ActiveNode active_inode_table;		//active inode table
 
 //Read information
@@ -34,20 +34,20 @@ void SaveUsers(FILE *fps);
 void ReadFromFile(FILE *fp){
 	int i;
 	//open file with binary stream
-	fp = fopen("filesystem", "rb");
+	fp = fopen(DISK_NAME, "rb");
 	//read super block
 	fread(&hx_superblock, sizeof(super_block), 1, fp);
 	//read inode
-	for (i = 0;i<512;i++){
+	for (i = 0;i<INODES_COUNT;i++){
 		fread(&file_inode[i], sizeof(inode), 1, fp);
 	}
 	//read directories
-	for (i = 0;i<512;i++)
+	for (i = 0;i<DIR_COUNT;i++)
 	{
 		fread(&file_dir[i], sizeof(dir), 1, fp);
 	}
 	//read data
-	for (i = 0;i<20500;i++)
+	for (i = 0;i<PHY_DATA_SIZE;i++)
 	{
 		fread(&phy[i], sizeof(physicalBlock), 1, fp);
 	}
@@ -61,20 +61,20 @@ void WriteToFile(FILE *fp)
 {
 	//open file with write binary stream mode
 	int i;
-	fp = fopen("filesystem", "wb");
+	fp = fopen(DISK_NAME, "wb");
 	//write super block
 	fwrite(&hx_superblock, sizeof(super_block), 1, fp);
 	//write inode
-	for (i = 0;i<512;i++){
+	for (i = 0;i<INODES_COUNT;i++){
 		fwrite(&file_inode[i], sizeof(inode), 1, fp);
 	}
 	//write directories
-	for (i = 0;i<512;i++)
+	for (i = 0;i<DIR_COUNT;i++)
 	{
 		fwrite(&file_dir[i], sizeof(dir), 1, fp);
 	}
 	//write data
-	for (i = 0;i<20500;i++)
+	for (i = 0;i<PHY_DATA_SIZE;i++)
 	{
 		fwrite(&phy[i], sizeof(physicalBlock), 1, fp);
 	}
@@ -87,7 +87,7 @@ void ReadUsers(FILE *fps){
 	//open file with binary stream
 	int i;
 	fps = fopen("users.txt", "rb");
-	for (i = 0;i<10;i++){
+	for (i = 0;i<USER_COUNT;i++){
 		fread(&L_user[i], sizeof(usernote), 1, fps);
 	}
 	fclose(fps);
@@ -99,7 +99,7 @@ void SaveUsers(FILE *fps){
 	//open file with write binary stream mode
 	int i;
 	fps = fopen("users.txt", "wb");
-	for (i = 0;i<8;i++){
+	for (i = 0;i<USER_COUNT;i++){
 		fwrite(&L_user[i], sizeof(usernote), 1, fps);
 	}
 	fclose(fps);

@@ -9,11 +9,11 @@
 #include "head.h"
 
 extern FTreepoint L_Ftree;
-extern dir file_dir[512];       //目录块
-extern inode file_inode[512];   //inode节点区
+extern dir file_dir[DIR_COUNT];       //目录块
+extern inode file_inode[INODES_COUNT];   //inode节点区
 void CreatBiTree1(FTreepoint &T, int& num); //递归方法构建文件树
 void InitfileTree(FTreepoint &T);    //该函数的作用是初始化的时候根据dir区构建文件树
-int find_inode_from_name(char name[10]);     //根据名字找到inode号
+int find_inode_from_name(char name[USER_NAME_LENGTH]);     //根据名字找到inode号
 void Tree_to_dir(int &num, dir file_dir[], FTreepoint &T);  //将树转化为目录区存储
 int find_num_of_file();     //求当前系统中有多少文件
 
@@ -21,9 +21,9 @@ void clear_dir(dir file_dir[]); //将file_dir清空
 
 
 
-int find_inode_from_name(char name[10])     //根据名字找到inode号
+int find_inode_from_name(char name[USER_NAME_LENGTH])     //根据名字找到inode号
 {
-	for (int i = 0;i < 512;i++)
+	for (int i = 0;i < DIR_COUNT;i++)
 	{
 		if (strcmp(name, file_dir[i].file_name) == 0)
 		{
@@ -37,7 +37,7 @@ int find_inode_from_name(char name[10])     //根据名字找到inode号
 int find_num_of_file()         //求当前系统中有多少文件
 {
 	int num = 0;
-	for (int i = 0;i<512;i++)
+	for (int i = 0;i<DIR_COUNT;i++)
 	{
 		if (file_dir[i].dir_inode >= 0)
 		{
@@ -142,7 +142,7 @@ void rename_file_tree(FTreepoint &T, SqStack s, char oldname[], char newname[]) 
 
 void clear_dir(dir file_dir[])  //将file_dir清空
 {
-	for (int i = 0;i<512;i++)     // 根目录区信息初始化
+	for (int i = 0;i<DIR_COUNT;i++)     // 根目录区信息初始化
 	{
 		strcpy(file_dir[i].file_name, "");   //文件名
 		file_dir[i].dir_inode = -1;                       //文件节点号

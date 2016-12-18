@@ -7,39 +7,54 @@
 *
 */
 #pragma once
-
+/*
+*	Size of physical data: 20480.
+*/
+#define PHY_DATA_SIZE 20480
+/*
+*	50 blocks/group
+*/
+#define BLOCK_GROUP_NUM 50
+/*
+*	The maximum number of inodes.
+*/
+#define INODES_COUNT 512
+/*
+*	The maximum number of directories.
+*/
+#define DIR_COUNT 512
 /*
 *	Size of a block: 512.
 */
-#define DATA_BLOCK_SIZE 512
+#define DATA_BLOCK_SIZE 10
 /*
-*	Number of direct adressing: 4.
+*	Size of BLOCK_GTOUP
 */
-#define DIRECT_DATA_COUNT 4
+#define BLOCK_GROUP_SIZE (PHY_DATA_SIZE/DATA_BLOCK_SIZE)
 /*
-*	Number of first level indirect addressing.
+*	Number of adressing: 15.
 */
-#define SINGAL_DATA_COUNT sizeof(inode) / sizeof(short)
-/*
-*	Number of second level indirect addressing.
-*/
-#define DOUBLE_DATA_COUNT sizeof(inode) / sizeof(short) * sizeof(inode) / sizeof(short)
+#define DATA_COUNT 15
 /*
 *	The maximum length of a file name.
 */
 #define FILE_NAME_LENGTH 14
 /*
+*	The maximum length of a directory name.
+*/
+#define DIR_NAME_LENGTH 14
+/*
+*	The maximum length of a path.
+*/
+#define PATH_LENGTH 14
+/*
+*	The maximum deep of stack.
+*/
+#define STACK_SIZE 100
+/*
 *	The maximum deep of free inode stack.
 */
-#define FREE_INODE_STACK_SIZE 128
-/*
-*	The maximum deep of free block stack.
-*/
-#define FREE_BLOCK_STACK_SIZE 20
-/*
-*	The maximum number of inodes.
-*/
-#define INODES_COUNT 128
+#define FREE_INODE_STACK_SIZE 50
 /*
 *	The number of data blocks.
 */
@@ -47,11 +62,15 @@
 /*
 *	The maximum number of the file system users.
 */
-#define USER_COUNT 15
+#define USER_COUNT 10
 /*
 *	The maximum number of files allowing to access.
 */
-#define USER_ALLOW_OPEN_COUNT 15	
+#define USER_ALLOW_OPEN_COUNT 25
+/*
+*	The maximum number of files allowing to access.
+*/
+#define SYSTEM_ALLOW_OPEN_COUNT 200
 /*
 *						File related
 *	First bit:	The type of inode(0 stands for a directory, 1 stands for a file.).
@@ -65,6 +84,7 @@
 *	Ninth bit:	Read permissions for other users.
 *	Tenth bit:	Executable permissions for other users.
 */
+#define PERMISSIONS 9
 #define INODE_TYPE 1 << 0
 #define USER_R 1 << 1
 #define USER_W 1 << 2
@@ -84,18 +104,6 @@
 */
 #define DIR_MAX (USER_R | USER_W | GROUP_R | GROUP_W | OTHER_R | OTHER_W)
 /*
-*	Size of direct adressing block.
-*/
-#define FILE_DIRECT_SIZE_MAX DATA_BLOCK_SIZE * DIRECT_DATA_COUNT
-/*
-*	Size of first indirect adressing block.
-*/
-#define FILE_SINGAL_SIZE_MAX sizeof(Inode) / sizeof(short) * DATA_BLOCK_SIZE
-/*
-*	Size of second indirect adressing block.
-*/
-#define FILE_DOUBLE_SIZE_MAX sizeof(Inode) / sizeof(short) * sizeof(Inode) / sizeof(short) * DATA_BLOCK_SIZE
-/*
 *	The maximum size of a file.
 */
 #define FILE_SIZE_MAX FILE_DIRECT_SIZE_MAX + FILE_SINGAL_SIZE_MAX + FILE_DOUBLE_SIZE_MAX
@@ -106,43 +114,19 @@
 /*
 *	The maximum number of commands.
 */
-#define CMD_COUNT 20
-/*
-*	The inode id for root directory.
-*/
-#define ROOT_INODE_NO 0
-/*
-*	The inode number of users' data.
-*/
-#define USERS_INODE_NO 1
-/*
-*	The inode number of groups' data.
-*/
-#define GROUPS_INODE_NO 2
-/*
-*	Administrator's id.
-*/
-#define SUPER_USER_ID 0
-/*
-*	Administrator group id.
-*/
-#define SUPER_GROUP_ID 0
-/*
-*	User group id.
-*/
-#define GENERAL_GROUP_ID 1
+#define COM_NUM 25
 /*
 *	The maximum size of user's name.
 */
-#define USER_NAME_LENGTH 16
+#define USER_NAME_LENGTH 14
 /*
 *	The maximum size of user's password.
 */
-#define USER_PASSWORD_LENGTH 16
+#define USER_PASSWORD_LENGTH 14
 /*
 *	The maximum size of group's name.
 */
-#define GROUP_NAME_LENGTH 16
+#define GROUP_NAME_LENGTH 14
 /*
 *	The maximum number of a group's account.
 */
@@ -167,3 +151,15 @@
 *	Groups' file name
 */
 #define GROUPS_FILE_NAME "group"
+/*
+*	File content buffer
+*/
+#define FILE_BUFFER 260
+/*
+*	File address buffer
+*/
+#define FILE_ADDRESS_BUFFER 1000
+/*
+*	Try username & password times number
+*/
+#define TRY_NUM 5

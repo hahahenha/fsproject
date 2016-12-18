@@ -15,10 +15,10 @@ int Gettop(SqStack S, char e[]);//get the top path
 int find_path(SqStack S);		//get absolute path
 
 int InitStack(SqStack &S){
-	S.base = (path*)malloc((100) * sizeof(path));
+	S.base = (path*)malloc((STACK_SIZE) * sizeof(path));
 	if (!S.base)exit(-2);
 	S.top = S.base;
-	S.stacksize = 100;
+	S.stacksize = STACK_SIZE;
 	return 1;
 }
 

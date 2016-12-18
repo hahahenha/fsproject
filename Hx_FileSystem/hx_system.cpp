@@ -11,17 +11,17 @@
 //Global variable
 extern usernote cur_user;			//current user
 extern SqStack cur_dir;     		//current directory
-extern Sys_cmd cmd[25];				//23 commands
-extern usernote L_user[10];			//users array
+extern Sys_cmd cmd[COM_NUM];				//23 commands
+extern usernote L_user[USER_COUNT];			//users array
 extern int f_inode;					//current active inode number
 
 extern super_block hx_superblock;   //super block
-extern inode file_inode[512];		//inode
-extern dir file_dir[512];			//directory
-extern physicalBlock phy[20500];	//data
+extern inode file_inode[INODES_COUNT];		//inode
+extern dir file_dir[DIR_COUNT];			//directory
+extern physicalBlock phy[PHY_DATA_SIZE];	//data
 
-extern  UserOpenTable user_open_table[10];	//user open table
-extern SystemOpenTable sys_open_table[200];	//system open table
+extern  UserOpenTable user_open_table[USER_ALLOW_OPEN_COUNT];	//user open table
+extern SystemOpenTable sys_open_table[SYSTEM_ALLOW_OPEN_COUNT];	//system open table
 extern ActiveNode active_inode_table;		//active inode table
 
 //表操作函数
@@ -51,17 +51,17 @@ int find_path(SqStack S);   //获取绝路径
 
 							//判断当前inode区域第一个空闲位置
 int find_free_inode(){
-	for (int i = 0;i<512;i++){
+	for (int i = 0;i<INODES_COUNT;i++){
 		if (file_inode[i].inode_number == -1){
 			return i;
 		}
 	}
-	printf("inode has already run out!");return -1;
+	printf(E3);return -1;
 }
 
 int cul_num_usetalbe(int i) {  //the number of user open table, i:user id
 	int num = 0;
-	for (int j = 0;j < 25;j++) {
+	for (int j = 0;j < USER_ALLOW_OPEN_COUNT;j++) {
 		if (user_open_table[i].point[j] > -1) {
 			num++;
 		}
@@ -69,10 +69,10 @@ int cul_num_usetalbe(int i) {  //the number of user open table, i:user id
 	return num;
 }
 
-int cul_num_systable(){    //number of system open table
+int cul_num_systable() {    //number of system open table
 	int num = 0;
-	for (int j = 0;j<200;j++){
-		if (sys_open_table[j].f_inode>-1){
+	for (int j = 0;j < SYSTEM_ALLOW_OPEN_COUNT;j++) {
+		if (sys_open_table[j].f_inode > -1) {
 			num++;
 		}
 	}
@@ -82,7 +82,7 @@ int cul_num_systable(){    //number of system open table
 
 int cul_num_inodetable(){    //active inode number
 	int num = 0;
-	for (int j = 0;j<200;j++){
+	for (int j = 0;j<SYSTEM_ALLOW_OPEN_COUNT;j++){
 		if (active_inode_table.activeinode[j].inode_number>-1){
 			num++;
 		}
@@ -91,7 +91,7 @@ int cul_num_inodetable(){    //active inode number
 }
 
 void insertInodeTable(int a){ //insert to active inode table，a:inode
-	for (int i = 0;i<200;i++){
+	for (int i = 0;i<SYSTEM_ALLOW_OPEN_COUNT;i++){
 		if (active_inode_table.activeinode[i].inode_number == -1){
 			active_inode_table.activeinode[i].inode_number = a;
 			strcpy(active_inode_table.activeinode[i].dir_name, file_inode[a].dir_name);
@@ -101,63 +101,63 @@ void insertInodeTable(int a){ //insert to active inode table，a:inode
 			active_inode_table.activeinode[i].file_style = file_inode[a].file_style;
 			active_inode_table.activeinode[i].file_userid = file_inode[a].file_userid;
 			int j;
-			for (j = 0;j<9;j++){
+			for (j = 0;j<PERMISSIONS;j++){
 				active_inode_table.activeinode[i].file_mode[j] = file_inode[a].file_mode[j];
 			}
-			for (j = 0;j<15;j++){
+			for (j = 0;j<DATA_COUNT;j++){
 				active_inode_table.activeinode[i].file_address[j] = file_inode[a].file_address[j];
 			}
 			return;
 		}
 	}
-	printf("Acitve inode table is full!\n");
+	printf(E4);
 }
 
-int insertSysTable(int a){   //向系统表中增加，返回值为增加的下标(遍历找第一个为空的位置)，a为增加的inode号
+int insertSysTable(int a) {   //向系统表中增加，返回值为增加的下标(遍历找第一个为空的位置)，a为增加的inode号
 	int i;
-	for (i = 0;i<200;i++){
-		if (sys_open_table[i].f_inode == a){  //存在则conut++;
+	for (i = 0;i < SYSTEM_ALLOW_OPEN_COUNT;i++) {
+		if (sys_open_table[i].f_inode == a) {  //存在则conut++;
 			sys_open_table[i].f_count++;
 			return i;
 		}
 	}
-	for (i = 0;i<200;i++){
-		if (sys_open_table[i].f_inode == -1){  //不存在则新建,同时在活动inode表中插入新的
+	for (i = 0;i < SYSTEM_ALLOW_OPEN_COUNT;i++) {
+		if (sys_open_table[i].f_inode == -1) {  //不存在则新建,同时在活动inode表中插入新的
 			sys_open_table[i].f_count = 1;
 			sys_open_table[i].f_inode = a;
 			insertInodeTable(a);
 			return i;
 		}
 	}
-	printf("The system open table is full!\n");
+	printf(E1);
 	return -1;
 }
 
 void InsertUserTable(int a, int i){ //向用户i表增加inode号为a的文件节点
-	for (int j = 0;j<25;j++){
+	for (int j = 0;j<USER_ALLOW_OPEN_COUNT;j++){
 		if (user_open_table[i].point[j] == -1){
 			user_open_table[i].point[j] = insertSysTable(a);
 			return;
 		}
 	}
-	printf("You can't open more files at the same time!\n");
+	printf(E2);
 }
 
 void DelInodeTable(int a){    //活动inode表删除
-	for (int i = 0;i<200;i++){
+	for (int i = 0;i<SYSTEM_ALLOW_OPEN_COUNT;i++){
 		if (active_inode_table.activeinode[i].inode_number == a){
 			active_inode_table.activeinode[i].inode_number = -1;
 			return;
 		}
 	}
-	printf("The file isn't in active inode table!\n");
+	printf(E5);
 }
 
-void DelSysTable(int a){      //系统表删除
-	for (int i = 0;i<200;i++){
-		if (sys_open_table[i].f_inode == a){  //存在则f_count--
+void DelSysTable(int a) {      //系统表删除
+	for (int i = 0;i < SYSTEM_ALLOW_OPEN_COUNT;i++) {
+		if (sys_open_table[i].f_inode == a) {  //存在则f_count--
 			sys_open_table[i].f_count--;
-			if (sys_open_table[i].f_count == 0){
+			if (sys_open_table[i].f_count == 0) {
 				DelInodeTable(a);
 				sys_open_table[i].f_inode = -1;
 				return;
@@ -165,32 +165,32 @@ void DelSysTable(int a){      //系统表删除
 			return;
 		}
 	}
-	printf("The file isn't in system open file!\n");
+	printf(E6);
 }
 
-void DelUserTable(int a, int i){  //用户表删除
-	for (int j = 0;j<25;j++){
-		if ((user_open_table[i].point[j]>-1) && (sys_open_table[user_open_table[i].point[j]].f_inode == a)){
+void DelUserTable(int a, int i) {  //用户表删除
+	for (int j = 0;j < USER_ALLOW_OPEN_COUNT;j++) {
+		if ((user_open_table[i].point[j] > -1) && (sys_open_table[user_open_table[i].point[j]].f_inode == a)) {
 			user_open_table[i].point[j] = -1;
 			DelSysTable(a);
 			return;
 		}
 	}
-	printf("The file isn't in user open table!\n");
+	printf(E7);
 }
 
-void str2stack(SqStack &s){        //输入文件路径，转化成对应的栈路径存储
+void str2stack(SqStack &s) {        //输入文件路径，转化成对应的栈路径存储
 	fflush(stdin);
 	InitStack(s);
-	printf("请输入连接的文件路径,以#结束，如:rooot/1/2/#\n");
-	char ch, c1[10];
+	printf("请输入连接的文件路径,以#结束，如:root/1/2/#\n");
+	char ch, c1[STACK_SIZE];
 	int num = 0;
-	while ((ch = getchar()) != '#'){
-		if (ch != '/'){
+	while ((ch = getchar()) != '#') {
+		if (ch != '/') {
 			c1[num] = ch;
 			num++;
 		}
-		else{
+		else {
 			c1[num] = 0;
 			push(s, c1);
 			num = 0;

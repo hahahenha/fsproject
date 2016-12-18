@@ -11,18 +11,18 @@
 //Global variable
 extern usernote cur_user;			//current user
 extern SqStack cur_dir;     		//current directory
-extern Sys_cmd cmd[25];				//23 commands
-extern usernote L_user[10];			//users array
+extern Sys_cmd cmd[COM_NUM];				//23 commands
+extern usernote L_user[USER_COUNT];			//users array
 extern int f_inode;					//current active inode number
 
 extern super_block hx_superblock;   //super block
-extern inode file_inode[512];		//inode
-extern dir file_dir[512];			//directory
-extern physicalBlock phy[20500];	//data
+extern inode file_inode[INODES_COUNT];		//inode
+extern dir file_dir[DIR_COUNT];			//directory
+extern physicalBlock phy[PHY_DATA_SIZE];	//data
 
 
-extern  UserOpenTable user_open_table[10];	//user open table
-extern SystemOpenTable sys_open_table[200];	//system open table
+extern  UserOpenTable user_open_table[USER_ALLOW_OPEN_COUNT];	//user open table
+extern SystemOpenTable sys_open_table[SYSTEM_ALLOW_OPEN_COUNT];	//system open table
 extern ActiveNode active_inode_table;		//active inode table
 
 extern FTreepoint L_Ftree;                 //file tree
@@ -146,7 +146,7 @@ void InitCommand(){
 //Shell
 void shell(FILE *fp){
 	int i, p;				//p: command number
-	char com[10], tmp[20];  //com: current command, tmp: parameter
+	char com[CMD_LENGTH], tmp[2*CMD_LENGTH];  //com: current command, tmp: parameter
 	while (1){
 		if (!login()) return;
 		while (1){
@@ -154,14 +154,14 @@ void shell(FILE *fp){
 			find_path(cur_dir);
 			printf(">");
 			scanf("%s", com);       //input a command 
-			for (i = 0;i<22;i++){
+			for (i = 0;i<COM_NUM;i++){
 				if (strcmp(com, cmd[i].com) == 0){
 					p = i;
 					break;
 				}
 			}
-			if (i == 22){			//Not find from the list
-				p = 22;
+			if (i == COM_NUM){			//Not find from the list
+				p = COM_NUM;
 			}
 			switch (p) {
 			case 0: WriteToFile(fp);return;     //shut down
@@ -193,7 +193,7 @@ void shell(FILE *fp){
 			//case 22: break;							//for extension
 			//case 23: break;							//for extension
 			//case 24: break;							//for extension
-			default: printf("Input error!\nTry help to get full information\n");break; 		//input error			 
+			default: printf(E21);break; 		//input error			 
 			}
 		}
 
@@ -203,32 +203,32 @@ void shell(FILE *fp){
 //Init disk
 void InitDisks(){
 	int i, j, num = 1;
-	hx_superblock.number_data = 20500;
-	hx_superblock.number_dir = 512;
-	hx_superblock.number_inode = 512;
-	for (i = 0;i<512;i++){
+	hx_superblock.number_data = PHY_DATA_SIZE;
+	hx_superblock.number_dir = DIR_COUNT;
+	hx_superblock.number_inode = INODES_COUNT;
+	for (i = 0;i<INODES_COUNT;i++){
 		hx_superblock.inode_info[i] = 0;
 		hx_superblock.dir_info[i] = 0;
 	}
-	for (i = 0;i<20500;i++)
+	for (i = 0;i<PHY_DATA_SIZE;i++)
 		hx_superblock.phydata[i] = 0;
 	//Init super block
 	hx_superblock.special_stack.bg_number=1;
-	hx_superblock.special_stack.free_num=50;
+	hx_superblock.special_stack.free_num= FREE_INODE_STACK_SIZE;
 	hx_superblock.special_stack.next=2;
-	for (i = 0;i < 50;i++) {
+	for (i = 0;i < FREE_INODE_STACK_SIZE;i++) {
 		hx_superblock.special_stack.free[i].flag = 0;
 		hx_superblock.special_stack.free[i].b_number = num;
 		num++;
 	}
 	num=0;
-	for (i = 0;i < 512;i++) {
+	for (i = 0;i < INODES_COUNT;i++) {
 		hx_superblock.memory[i].bg_number = i + 1;
-		hx_superblock.memory[i].free_num = 50;
+		hx_superblock.memory[i].free_num = FREE_INODE_STACK_SIZE;
 		hx_superblock.memory[i].next = i + 2;
-		if (i == 511)
+		if (i == INODES_COUNT - 1)
 			hx_superblock.memory[i].next = 0;
-		for (j = 0;j < 50;j++) {
+		for (j = 0;j < FREE_INODE_STACK_SIZE;j++) {
 			hx_superblock.memory[i].free[j].flag = 0;
 			hx_superblock.memory[i].free[j].b_number = num;
 			num++;
@@ -236,12 +236,12 @@ void InitDisks(){
 	}
 
 	//Init inode
-	for (i = 0;i<512;i++){
-		for (j = 0;j<9;j++)
+	for (i = 0;i<INODES_COUNT;i++){
+		for (j = 0;j<PERMISSIONS;j++)
 			file_inode[i].file_mode[j] = -1;	//read or write permission
-		for (j = 0;j<15;j++)
+		for (j = 0;j<DATA_COUNT;j++)
 			file_inode[i].file_address[j] = -1;	//file addressing
-		for (j = 0;j<15;j++)
+		for (j = 0;j<FILE_NAME_LENGTH;j++)
 			file_inode[i].dir_name[j] = -1;		//directory
 		file_inode[i].inode_number = -1;		//inode number
 		file_inode[i].file_length = -1;			//file length
@@ -251,13 +251,13 @@ void InitDisks(){
 		file_inode[i].file_groupid = -1;		//group id
 	}
 	//Init root directory
-	for (i = 0;i<512;i++){     
+	for (i = 0;i<DIR_COUNT;i++){
 		strcpy(file_dir[i].file_name, "");   //file name
 		file_dir[i].dir_inode = -1;          //file inode
 	}
 	//Init data blocks
-	for (i = 0;i<20500;i++)     
-		for (j = 0;j<10;j++)
+	for (i = 0;i<PHY_DATA_SIZE;i++)
+		for (j = 0;j<DATA_BLOCK_SIZE;j++)
 			phy[i].p[j] = -1;
 
 }
@@ -301,21 +301,21 @@ void InitTable(){
 	int i, j;
 	
 	//Init user open table
-	for (i = 0;i<10;i++)
-		for (j = 0;j<25;j++)
+	for (i = 0;i<USER_COUNT;i++)
+		for (j = 0;j<USER_ALLOW_OPEN_COUNT;j++)
 			user_open_table[i].point[j] = -1;
 	//Init system open table
-	for (i = 0; i<200; i++){
+	for (i = 0; i<SYSTEM_ALLOW_OPEN_COUNT; i++){
 		sys_open_table[i].f_inode = -1;
 		sys_open_table[i].f_count = -1;
 	}
 	//Init active inode
-	for (i = 0;i<200;i++){
-		for (j = 0;j<9;j++)\
+	for (i = 0;i<SYSTEM_ALLOW_OPEN_COUNT;i++){
+		for (j = 0;j<PERMISSIONS;j++)
 			active_inode_table.activeinode[i].file_mode[j] = -1;	//permission
-		for (j = 0;j<15;j++)
+		for (j = 0;j<DATA_COUNT;j++)
 			active_inode_table.activeinode[i].file_address[j] = -1;	//file address 
-		for (j = 0;j<15;j++)
+		for (j = 0;j<DIR_NAME_LENGTH;j++)
 			active_inode_table.activeinode[i].dir_name[j] = -1;		//directory
 		active_inode_table.activeinode[i].inode_number = -1;		//inode number
 		active_inode_table.activeinode[i].file_length = -1;			//file length
