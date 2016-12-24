@@ -30,8 +30,8 @@ extern FTreepoint L_Ftree;                 //file tree
 //File operating
 void ReadFromFile(FILE *fp);	//read file
 void WriteToFile(FILE *fp);		//write file
-void ReadUsers(FILE *fps);		//get users
-void SaveUsers(FILE *fps);		//save users
+void ReadUsers();		//get users
+void SaveUsers();		//save users
 
 //Init function
 void InitSystem(FILE *fp);		//Init system
@@ -106,12 +106,13 @@ void InitSystem(FILE *fp){
 		InitDisks();		//Init the disk
 	else
 		ReadFromFile(fp);   //read disk
-	InitUsers();			//Init users
 	InitTable();			//Init file table
 	InitCommand();
 	InitStack(cur_dir);      //Init stack path
 	push(cur_dir, "root");
 	InitfileTree(L_Ftree);
+	InitUsers();			//Init users
+	WriteToFile(fp);
 }
 
 //Init command
@@ -267,16 +268,16 @@ void InitUsers()
 {
 	FILE *fps;
 	// 判断用户信息文件是否存在,如果用户文件存在,就通过read函数将用户的信息从文件中读取并存入User数据结构中
-	if ((fps = fopen("users.txt", "rb")) == NULL){
+	if ((fps = fopen("disk.han", "rb")) == NULL){
 		L_user[0].userid = 0;						//不存在，则初始化1个用户,userid从0开始
 		strcpy(L_user[0].username, "admin");
 		strcpy(L_user[0].password, "admin");
-		//		strcpy(L_user[0].username,"1");
-		//		strcpy(L_user[0].password,"1");
+		//strcpy(L_user[0].username,"1");
+		//strcpy(L_user[0].password,"1");
 		L_user[0].group = 1;
 		L_user[0].level = 1;
 		//除了初始化时生成的超级管理员之外,其余用户空间都值为负值,等待用户创建
-		for (int i = 1;i<10;i++)
+		for (int i = 1;i<USER_COUNT;i++)
 		{
 			L_user[i].userid = -1;
 			strcpy(L_user[i].username, "");//用户名以及密码都设置为空
@@ -284,13 +285,14 @@ void InitUsers()
 			L_user[i].group = -1;
 			L_user[i].level = -1;
 		}
-		//调用Save函数将用户的信息存入User.txt文件
-		SaveUsers(fps);
+
+		create_file("pw");
+		SaveUsers();
 	}
 	else
 	{
 		//读出系统用户
-		ReadUsers(fps);
+		ReadUsers();
 		fclose(fps);
 	}
 

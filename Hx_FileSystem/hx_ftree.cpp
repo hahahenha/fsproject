@@ -3,25 +3,24 @@
 * All rights reserved.
 * Project name：Simple File System
 * Programmer：Randolph Han
-* Finish：2016.12.??
+* Finish：2016.12.18
 *
 */
 #include "head.h"
 
 extern FTreepoint L_Ftree;
-extern dir file_dir[DIR_COUNT];       //目录块
-extern inode file_inode[INODES_COUNT];   //inode节点区
-void CreatBiTree1(FTreepoint &T, int& num); //递归方法构建文件树
-void InitfileTree(FTreepoint &T);    //该函数的作用是初始化的时候根据dir区构建文件树
-int find_inode_from_name(char name[USER_NAME_LENGTH]);     //根据名字找到inode号
-void Tree_to_dir(int &num, dir file_dir[], FTreepoint &T);  //将树转化为目录区存储
-int find_num_of_file();     //求当前系统中有多少文件
+extern dir file_dir[DIR_COUNT];				//dir block
+extern inode file_inode[INODES_COUNT];		//inode
+void CreatBiTree1(FTreepoint &T, int& num); //create tree
+void InitfileTree(FTreepoint &T);			//create tree(from dir)
+int find_inode_from_name(char name[USER_NAME_LENGTH]);		//find inode by file name
+void Tree_to_dir(int &num, dir file_dir[], FTreepoint &T);  //save tree
+int find_num_of_file();			//culate the sum of files
 
-void clear_dir(dir file_dir[]); //将file_dir清空
+void clear_dir(dir file_dir[]); //clear file_dir
 
-
-
-int find_inode_from_name(char name[USER_NAME_LENGTH])     //根据名字找到inode号
+//find inode by file name
+int find_inode_from_name(char name[USER_NAME_LENGTH])
 {
 	for (int i = 0;i < DIR_COUNT;i++)
 	{
@@ -34,7 +33,8 @@ int find_inode_from_name(char name[USER_NAME_LENGTH])     //根据名字找到inode号
 	return -1;
 }
 
-int find_num_of_file()         //求当前系统中有多少文件
+//culate the sum of files
+int find_num_of_file()
 {
 	int num = 0;
 	for (int i = 0;i<DIR_COUNT;i++)
@@ -46,19 +46,21 @@ int find_num_of_file()         //求当前系统中有多少文件
 	}
 	return num;
 }
-void InitfileTree(FTreepoint &T)    //该函数的作用是初始化的时候根据dir区构建文件树
+
+
+void InitfileTree(FTreepoint &T)
 {
 	int a = 0;
-	T = (FTree *)malloc(sizeof(FTree));//根节点没有在存储区开辟空间，默认加载在内存中，右子树为空
+	T = (FTree *)malloc(sizeof(FTree));
 	strcpy(T->data.file_name, "root");
 	T->lchild = T->rchild = NULL;
 	if (find_num_of_file()>0)
 	{
-		CreatBiTree1(T->lchild, a);   //0代表从dir区第几个开始
+		CreatBiTree1(T->lchild, a);
 	}
 }
 
-void CreatBiTree1(FTreepoint &T, int& num) //递归方法,按照先序遍历顺序构建文件树
+void CreatBiTree1(FTreepoint &T, int& num)
 {
 	if (num >= find_num_of_file())
 	{
@@ -70,7 +72,7 @@ void CreatBiTree1(FTreepoint &T, int& num) //递归方法,按照先序遍历顺序构建文件树
 	T->data.dir_inode = file_dir[num].dir_inode;
 	strcpy(T->data.file_name, file_dir[num].file_name);
 	num++;
-	if (strcmp(file_inode[find_inode_from_name(file_dir[num].file_name)].dir_name, T->data.file_name) == 0)   //当前文件的子文件
+	if (strcmp(file_inode[find_inode_from_name(file_dir[num].file_name)].dir_name, T->data.file_name) == 0)
 	{
 		CreatBiTree1(T->lchild, num);
 	}
@@ -80,7 +82,8 @@ void CreatBiTree1(FTreepoint &T, int& num) //递归方法,按照先序遍历顺序构建文件树
 	}
 }
 
-void Tree_to_dir(int &num, dir file_dir[], FTreepoint &T)   //将树转化为目录区存储
+//save tree to disk
+void Tree_to_dir(int &num, dir file_dir[], FTreepoint &T)
 {
 	if (T)
 	{
@@ -92,7 +95,8 @@ void Tree_to_dir(int &num, dir file_dir[], FTreepoint &T)   //将树转化为目录区存
 	}
 }
 
-int path_tnode(SqStack S, FTreepoint T, FTreepoint &p)        //根据当前路径得到对应的根节点
+//find root
+int path_tnode(SqStack S, FTreepoint T, FTreepoint &p)
 {
 	FTreepoint t1;
 	t1 = T;
@@ -112,7 +116,7 @@ int path_tnode(SqStack S, FTreepoint T, FTreepoint &p)        //根据当前路径得到
 		{
 			while (t1 != NULL)
 			{
-				if (strcmp((*a).data, t1->data.file_name) == 0)  //存在同名文件
+				if (strcmp((*a).data, t1->data.file_name) == 0)
 				{
 					break;
 				}
@@ -125,31 +129,33 @@ int path_tnode(SqStack S, FTreepoint T, FTreepoint &p)        //根据当前路径得到
 }
 
 
-void add_file_tree(FTreepoint &T, SqStack s, char newname[], int newinode)  //s为当前路径
+void add_file_tree(FTreepoint &T, SqStack s, char newname[], int newinode)
 {
 
 }
 
-void del_file_tree(FTreepoint &T, SqStack s, char oldname[], int &oldinode) //s为当前路径
+void del_file_tree(FTreepoint &T, SqStack s, char oldname[], int &oldinode)
 {
 
 }
 
-void rename_file_tree(FTreepoint &T, SqStack s, char oldname[], char newname[]) //s为当前路径
+void rename_file_tree(FTreepoint &T, SqStack s, char oldname[], char newname[])
 {
 
 }
 
-void clear_dir(dir file_dir[])  //将file_dir清空
+//clear dir
+void clear_dir(dir file_dir[])
 {
-	for (int i = 0;i<DIR_COUNT;i++)     // 根目录区信息初始化
+	for (int i = 0;i<DIR_COUNT;i++)
 	{
-		strcpy(file_dir[i].file_name, "");   //文件名
-		file_dir[i].dir_inode = -1;                       //文件节点号
+		strcpy(file_dir[i].file_name, "");
+		file_dir[i].dir_inode = -1;
 	}
 }
 
-void cul_num(FTreepoint &T, int &n_file, int &n_dir)  //根据文件树计算文件个数和文件夹个数
+//culate file number
+void cul_num(FTreepoint &T, int &n_file, int &n_dir)
 {
 	if (T)
 	{

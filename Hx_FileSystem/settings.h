@@ -3,7 +3,7 @@
 * All rights reserved.
 * Project name£ºSimple File System
 * Programmer£ºRandolph Han
-* Finish£º2016.12.12
+* Finish£º2016.12.18
 *
 */
 #pragma once
@@ -62,7 +62,7 @@
 /*
 *	The maximum number of the file system users.
 */
-#define USER_COUNT 10
+#define USER_COUNT 5
 /*
 *	The maximum number of files allowing to access.
 */

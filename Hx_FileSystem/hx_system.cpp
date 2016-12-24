@@ -3,7 +3,7 @@
 * All rights reserved.
 * Project name£ºSimple File System
 * Programmer£ºRandolph Han
-* Finish£º2016.12.12
+* Finish£º2016.12.24
 *
 */
 #include "head.h"
@@ -24,32 +24,28 @@ extern  UserOpenTable user_open_table[USER_ALLOW_OPEN_COUNT];	//user open table
 extern SystemOpenTable sys_open_table[SYSTEM_ALLOW_OPEN_COUNT];	//system open table
 extern ActiveNode active_inode_table;		//active inode table
 
-//±í²Ù×÷º¯Êı
-int cul_num_usetalbe(int i);  //i´ú±íuserid,¸ÃÓÃ»§´ò¿ª¶àÉÙÎÄ¼ş
-int cul_num_systable();    //ÏµÍ³´ò¿ª±íµÄ¸öÊı
-int cul_num_inodetable();    //»î¶¯inode´ò¿ª±íµÄ¸öÊı
-void InsertUserTable(int a, int i); //ÏòÓÃ»§i±íÔö¼ÓinodeºÅÎªaµÄÎÄ¼ş½Úµã
-void DelUserTable(int a, int i);  //ÓÃ»§±íÉ¾³ı
+//table operatorate
+int cul_num_usetalbe(int i);	//culate the number of files opened, i:userid
+int cul_num_systable();			//culate the number of files system opened
+int cul_num_inodetable();		//culate the number of active inode
+void InsertUserTable(int a, int i); //insert the a number inode to user open table
+void DelUserTable(int a, int i);  //ÓÃdelete inode from user open table
 
 
-//ÏµÍ³ÔËĞĞº¯Êı
+//system function ??
 void InsertTable(char filename[], int i_num);
 int SelectTable(char filename[]);
 int IsPermit(int i_num, char operation);
 int AllotDisks(int length);
 void RecoverDisks(int length);
 
-int cul_num_inodetable();   //»î¶¯inode´ò¿ª±íµÄ¸öÊı
-int cul_num_usetalbe(int i); //i´ú±íuserid,¸ÃÓÃ»§´ò¿ª¶àÉÙÎÄ¼ş
-int cul_num_systable();   //ÏµÍ³´ò¿ª±íµÄ¸öÊı
-
-int InitStack(SqStack &S);   //³õÊ¼»¯Â·¾¶
+int InitStack(SqStack &S);   //stack init
 int pop(SqStack &S, char e[]);
 int push(SqStack &S, char e[]);
 int Gettop(SqStack S, char e[]);
-int find_path(SqStack S);   //»ñÈ¡¾øÂ·¾¶
+int find_path(SqStack S);   //get the path
 
-							//ÅĞ¶Ïµ±Ç°inodeÇøÓòµÚÒ»¸ö¿ÕÏĞÎ»ÖÃ
+
 int find_free_inode(){
 	for (int i = 0;i<INODES_COUNT;i++){
 		if (file_inode[i].inode_number == -1){
@@ -59,7 +55,8 @@ int find_free_inode(){
 	printf(E3);return -1;
 }
 
-int cul_num_usetalbe(int i) {  //the number of user open table, i:user id
+//the number of user open table, i:user id
+int cul_num_usetalbe(int i) {  
 	int num = 0;
 	for (int j = 0;j < USER_ALLOW_OPEN_COUNT;j++) {
 		if (user_open_table[i].point[j] > -1) {
@@ -69,7 +66,8 @@ int cul_num_usetalbe(int i) {  //the number of user open table, i:user id
 	return num;
 }
 
-int cul_num_systable() {    //number of system open table
+//number of system open table
+int cul_num_systable() {    
 	int num = 0;
 	for (int j = 0;j < SYSTEM_ALLOW_OPEN_COUNT;j++) {
 		if (sys_open_table[j].f_inode > -1) {
@@ -79,8 +77,8 @@ int cul_num_systable() {    //number of system open table
 	return num;
 }
 
-
-int cul_num_inodetable(){    //active inode number
+//active inode number
+int cul_num_inodetable(){    
 	int num = 0;
 	for (int j = 0;j<SYSTEM_ALLOW_OPEN_COUNT;j++){
 		if (active_inode_table.activeinode[j].inode_number>-1){
@@ -90,7 +88,8 @@ int cul_num_inodetable(){    //active inode number
 	return num;
 }
 
-void insertInodeTable(int a){ //insert to active inode table£¬a:inode
+//insert to active inode table£¬a:inode
+void insertInodeTable(int a){ 
 	for (int i = 0;i<SYSTEM_ALLOW_OPEN_COUNT;i++){
 		if (active_inode_table.activeinode[i].inode_number == -1){
 			active_inode_table.activeinode[i].inode_number = a;
@@ -113,16 +112,17 @@ void insertInodeTable(int a){ //insert to active inode table£¬a:inode
 	printf(E4);
 }
 
-int insertSysTable(int a) {   //ÏòÏµÍ³±íÖĞÔö¼Ó£¬·µ»ØÖµÎªÔö¼ÓµÄÏÂ±ê(±éÀúÕÒµÚÒ»¸öÎª¿ÕµÄÎ»ÖÃ)£¬aÎªÔö¼ÓµÄinodeºÅ
+//insert inode to system open table, inode number: a
+int insertSysTable(int a) {   
 	int i;
 	for (i = 0;i < SYSTEM_ALLOW_OPEN_COUNT;i++) {
-		if (sys_open_table[i].f_inode == a) {  //´æÔÚÔòconut++;
+		if (sys_open_table[i].f_inode == a) {  //if exists, conut++;
 			sys_open_table[i].f_count++;
 			return i;
 		}
 	}
 	for (i = 0;i < SYSTEM_ALLOW_OPEN_COUNT;i++) {
-		if (sys_open_table[i].f_inode == -1) {  //²»´æÔÚÔòĞÂ½¨,Í¬Ê±ÔÚ»î¶¯inode±íÖĞ²åÈëĞÂµÄ
+		if (sys_open_table[i].f_inode == -1) {  //else create
 			sys_open_table[i].f_count = 1;
 			sys_open_table[i].f_inode = a;
 			insertInodeTable(a);
@@ -133,7 +133,8 @@ int insertSysTable(int a) {   //ÏòÏµÍ³±íÖĞÔö¼Ó£¬·µ»ØÖµÎªÔö¼ÓµÄÏÂ±ê(±éÀúÕÒµÚÒ»¸öÎ
 	return -1;
 }
 
-void InsertUserTable(int a, int i){ //ÏòÓÃ»§i±íÔö¼ÓinodeºÅÎªaµÄÎÄ¼ş½Úµã
+//insert inode to user open table
+void InsertUserTable(int a, int i){
 	for (int j = 0;j<USER_ALLOW_OPEN_COUNT;j++){
 		if (user_open_table[i].point[j] == -1){
 			user_open_table[i].point[j] = insertSysTable(a);
@@ -143,7 +144,8 @@ void InsertUserTable(int a, int i){ //ÏòÓÃ»§i±íÔö¼ÓinodeºÅÎªaµÄÎÄ¼ş½Úµã
 	printf(E2);
 }
 
-void DelInodeTable(int a){    //»î¶¯inode±íÉ¾³ı
+//delete
+void DelInodeTable(int a){
 	for (int i = 0;i<SYSTEM_ALLOW_OPEN_COUNT;i++){
 		if (active_inode_table.activeinode[i].inode_number == a){
 			active_inode_table.activeinode[i].inode_number = -1;
@@ -153,9 +155,10 @@ void DelInodeTable(int a){    //»î¶¯inode±íÉ¾³ı
 	printf(E5);
 }
 
-void DelSysTable(int a) {      //ÏµÍ³±íÉ¾³ı
+//delete from system open table
+void DelSysTable(int a) {
 	for (int i = 0;i < SYSTEM_ALLOW_OPEN_COUNT;i++) {
-		if (sys_open_table[i].f_inode == a) {  //´æÔÚÔòf_count--
+		if (sys_open_table[i].f_inode == a) { 
 			sys_open_table[i].f_count--;
 			if (sys_open_table[i].f_count == 0) {
 				DelInodeTable(a);
@@ -168,7 +171,8 @@ void DelSysTable(int a) {      //ÏµÍ³±íÉ¾³ı
 	printf(E6);
 }
 
-void DelUserTable(int a, int i) {  //ÓÃ»§±íÉ¾³ı
+//delete from user open table
+void DelUserTable(int a, int i) { 
 	for (int j = 0;j < USER_ALLOW_OPEN_COUNT;j++) {
 		if ((user_open_table[i].point[j] > -1) && (sys_open_table[user_open_table[i].point[j]].f_inode == a)) {
 			user_open_table[i].point[j] = -1;
@@ -179,10 +183,11 @@ void DelUserTable(int a, int i) {  //ÓÃ»§±íÉ¾³ı
 	printf(E7);
 }
 
-void str2stack(SqStack &s) {        //ÊäÈëÎÄ¼şÂ·¾¶£¬×ª»¯³É¶ÔÓ¦µÄÕ»Â·¾¶´æ´¢
+//path to stack
+void str2stack(SqStack &s) {
 	fflush(stdin);
 	InitStack(s);
-	printf("ÇëÊäÈëÁ¬½ÓµÄÎÄ¼şÂ·¾¶,ÒÔ#½áÊø£¬Èç:root/1/2/#\n");
+	printf("Please input the absolute path, end with '#'(ex:root/1/2/#\n)");
 	char ch, c1[STACK_SIZE];
 	int num = 0;
 	while ((ch = getchar()) != '#') {
@@ -198,7 +203,8 @@ void str2stack(SqStack &s) {        //ÊäÈëÎÄ¼şÂ·¾¶£¬×ª»¯³É¶ÔÓ¦µÄÕ»Â·¾¶´æ´¢
 	}
 }
 
-int findtreeinode(SqStack S, FTreepoint T, FTreepoint &p){     //¸ù¾İÂ·¾¶ÕÒµ½¶ÔÓ¦½Úµã
+//find the inode
+int findtreeinode(SqStack S, FTreepoint T, FTreepoint &p){
 	FTreepoint t1;
 	t1 = T;
 	path *a;
@@ -213,7 +219,7 @@ int findtreeinode(SqStack S, FTreepoint T, FTreepoint &p){     //¸ù¾İÂ·¾¶ÕÒµ½¶ÔÓ
 		}
 		else{
 			while (t1 != NULL){
-				if (strcmp((*a).data, t1->data.file_name) == 0){  //´æÔÚÍ¬ÃûÎÄ¼ş
+				if (strcmp((*a).data, t1->data.file_name) == 0){
 					break;
 				}
 				t1 = t1->rchild;

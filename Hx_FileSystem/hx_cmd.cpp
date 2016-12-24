@@ -3,7 +3,7 @@
 * All rights reserved.
 * Project name：Simple File System
 * Programmer：Randolph Han
-* Finish：2016.12.11-2016.12.??
+* Finish：2016.12.11-2016.12.31
 *
 */
 #include "head.h"
@@ -12,17 +12,17 @@
 extern usernote cur_user;			//current user
 extern SqStack cur_dir;     		//current directory
 extern Sys_cmd cmd[COM_NUM];		//25 commands
-extern usernote L_user[USER_COUNT];			//users array
+extern usernote L_user[USER_COUNT];	//users array
 extern int f_inode;					//current active inode number
 
 extern super_block hx_superblock;   //super block
-extern inode file_inode[INODES_COUNT];		//inode
+extern inode file_inode[INODES_COUNT];	//inode
 extern dir file_dir[DIR_COUNT];			//directory
-extern physicalBlock phy[PHY_DATA_SIZE];	//data
+extern physicalBlock phy[PHY_DATA_SIZE];//data
 
 extern char buffer[FILE_BUFFER];					//file content buffer
 
-extern  UserOpenTable user_open_table[USER_ALLOW_OPEN_COUNT];	//user open table
+extern UserOpenTable user_open_table[USER_ALLOW_OPEN_COUNT];	//user open table
 extern SystemOpenTable sys_open_table[SYSTEM_ALLOW_OPEN_COUNT];	//system open table
 extern ActiveNode active_inode_table;		//active inode table
 
@@ -31,8 +31,8 @@ extern FTreepoint L_Ftree;                 //file tree
 //File operating
 void ReadFromFile(FILE *fp);	//read file
 void WriteToFile(FILE *fp);		//write file
-void ReadUsers(FILE *fps);		//get users
-void SaveUsers(FILE *fps);		//save users
+void ReadUsers();		//get users
+void SaveUsers();		//save users
 
 								//Init function
 void InitSystem(FILE *fp);		//Init system
@@ -113,7 +113,7 @@ void help(){
 	printf("\t18.Rename a file............................(mv + fname)\n");
 	printf("\t19.硬链接................................(hlink + fname)\n");
 	printf("\t20.软链接................................(slink + fname)\n");
-	printf("\t21.管理用户(显示管理菜单)........................(Muser)\n");
+	printf("\t21.User Management Menu..........................(Muser)\n");
 }
 
 
@@ -176,27 +176,28 @@ int login(){
 void show_curdir(){
 	int i;
 	//formta
-	printf("\t\tname\ttype\tlength\tpermission\tuser\tgroup\n");
+	printf("\tname\ttype\tlength\tpermission\tuser\tgroup\ttime\n");
 	FTreepoint p = NULL;
 	path_tnode(cur_dir, L_Ftree, p);
+	
 	p = p->lchild;
 	while (p != NULL){
 		if (file_inode[p->data.dir_inode].file_style == 1){
-			printf("\t\t%s ", p->data.file_name);
+			printf("\t%s ", p->data.file_name);
 			printf("\t%d\t%d\t", file_inode[p->data.dir_inode].file_style, file_inode[p->data.dir_inode].file_length);
 			for (i = 0;i<PERMISSIONS;i++){
 				printf("%c", file_inode[p->data.dir_inode].file_mode[i] + 48);
 			}
-			printf("\t%d\t%d\n", file_inode[p->data.dir_inode].file_userid, file_inode[p->data.dir_inode].file_groupid);
-
+			printf("\t%d\t%d\t", file_inode[p->data.dir_inode].file_userid, file_inode[p->data.dir_inode].file_groupid);
+			printf("%s\n", file_inode[p->data.dir_inode].time);
 		}
 		if (file_inode[p->data.dir_inode].file_style == 0){
-			printf("\t\t%s ", p->data.file_name);
+			printf("\t%s ", p->data.file_name);
 			printf("\t%d\t%d\t", file_inode[p->data.dir_inode].file_style, file_inode[p->data.dir_inode].file_length);
 			for (i = 0;i<PERMISSIONS;i++){
 				printf("%c", file_inode[p->data.dir_inode].file_mode[i] + 48);
 			}
-			printf("\n");
+			printf("\t\t\t%s\n", file_inode[p->data.dir_inode].time);
 		}
 		p = p->rchild;
 	}
@@ -394,7 +395,7 @@ void create_file(char filename[]){
 	int a = find_free_inode();
 	p->data.dir_inode = a;
 	{
-		char c[10];Gettop(cur_dir, c);
+		char c[DIR_NAME_LENGTH];Gettop(cur_dir, c);
 		strcpy(file_inode[a].dir_name, c);           //file dir
 		file_inode[a].file_style = 1;
 		file_inode[a].file_icount = 0;
@@ -402,9 +403,14 @@ void create_file(char filename[]){
 		file_inode[a].inode_number = a;
 		for (int i = 0;i < 9;i++) {						//default permission
 			file_inode[a].file_mode[i] = 1;
+			if(i > 0 && filename == "pw")
+				file_inode[a].file_mode[i] = 0;
 		}
 		file_inode[a].file_groupid = cur_user.group;
 		file_inode[a].file_userid = cur_user.userid;
+		time_t t = time(0);
+		strftime(file_inode[a].time, sizeof(file_inode[a].time), "%Y/%m/%d %X %A %jday of the current year %z", localtime(&t));
+		//puts(file_inode[a].time);
 	}
 	int i = 0;
 	clear_dir(file_dir);
@@ -837,7 +843,7 @@ void read_file(char filename[]){
 					}
 					else printf(E12);
 				}
-				else if (cur_user.group == file_inode[a].file_groupid)   //同组
+				else if (cur_user.group == file_inode[a].file_groupid)   //same group
 				{
 					if (file_inode[a].file_mode[3] == 1)
 					{
@@ -1168,15 +1174,13 @@ void write_file(char filename[])
 	}
 }
 
-//查看系统信息
+//show system information
 void show_info()
 {
-
-	//打印系统当前信息
 	printf("\t*************************\n");
 
 	printf("\tSystem Information:\n\n");
-	int n_file, n_dir;   //统计文件个数和文件夹个数
+	int n_file, n_dir;
 	n_dir = n_file = 0;
 	int i, m, k = 0;
 	for (i = 0;i<PHY_DATA_SIZE;i++)
@@ -1189,7 +1193,6 @@ void show_info()
 	printf("%d\n", k);
 	printf("\tAlready used:\t");
 	printf("%d\n", m);
-	//打印用户打开表状态
 
 	printf("\t*************************\n");
 	printf("\tSystem open file information:\n\n");
@@ -1217,7 +1220,6 @@ void show_info()
 	printf("\tFile:\t");
 	printf("\t%d\n", n_file);
 
-	//打印当前用户信息
 	printf("\t****************************\n");
 	printf("\tCurrent user:\n\n");
 	printf("\t\tUser ID:\t%d\n", cur_user.userid);
@@ -1249,13 +1251,13 @@ int change_user(FILE *fp, char username[])
 				break;
 			}
 	}
-	//查找不到
+	//can't find
 	if (f == -1)
 	{
 		printf(E15);
 		return -1;
 	}
-	//将目前的信息写入文件,防止刚刚操作丢失
+	//write to file
 	WriteToFile(fp);
 	system("cls");			//********************不符合实验要求函数！！！*********************************
 
@@ -1293,6 +1295,7 @@ int change_user(FILE *fp, char username[])
 	}
 	return 0;
 }
+
 //change file's mode
 void change_mode(char filename[])
 {
@@ -1309,7 +1312,7 @@ void change_mode(char filename[])
 		while (p != NULL)
 		{
 			//
-			if ((strcmp(p->data.file_name, filename) == 0) && (file_inode[p->data.dir_inode].file_style == 1))  //存在同名文件
+			if ((strcmp(p->data.file_name, filename) == 0) && (file_inode[p->data.dir_inode].file_style == 1))
 			{
 				a = p->data.dir_inode;
 				int i = 0;
@@ -1325,7 +1328,7 @@ void change_mode(char filename[])
 					printf(E6);
 					return;
 				}
-				if (cur_user.userid == file_inode[a].file_userid)     //属主
+				if (cur_user.userid == file_inode[a].file_userid)
 				{
 					printf("Please input 0&1 string(1 stands for having, 0 for not)\n");
 					printf("Format：r w e r w e r w e\n");
@@ -1333,6 +1336,9 @@ void change_mode(char filename[])
 					{
 						scanf("%d", &(file_inode[a].file_mode[j]));
 					}
+					time_t t = time(0);
+					strftime(file_inode[a].time, sizeof(file_inode[a].time), "%Y/%m/%d %X %A %jday of current year %z", localtime(&t));
+					//puts(file_inode[a].time);
 					return;
 				}
 				else printf(E18);
@@ -1346,13 +1352,11 @@ void change_mode(char filename[])
 //user management
 void manage_user()
 {
-	FILE *fp;
-	fp = fopen("users.txt", "wb");
-	//权限查找
-	if (cur_user.level != 1)    //管理员才有权限进行管理
+	//rights check
+	if (cur_user.level != 1) 
 	{
 		printf(E19);
-		SaveUsers(fp);
+		SaveUsers();
 		return;
 	}
 	printf("Welcome to user management!\n");
@@ -1366,17 +1370,15 @@ void manage_user()
 	{
 		printf("Select (1.view 2.insert 3.del  0.save&exit):\n");
 		scanf("%d", &f);
-		//将文件信息保存,退出
 		if (f == 0)
 		{
-			SaveUsers(fp);
+			SaveUsers();
 			break;
 		}
-		//循环显示用户信息
 		if (f == 1)
 		{
-			printf("用户ID\t用户名\t用户组\t用户等级\n");
-			for (i = 0;i<10;i++)
+			printf("User ID\tName\tGroup\tLevel\n");
+			for (i = 0;i<USER_COUNT;i++)
 			{
 				if (L_user[i].userid != -1)
 				{
@@ -1384,58 +1386,49 @@ void manage_user()
 				}
 			}
 		}
-		//插入用户信息
 		if (f == 2)
 		{
-			//查找第一个空用户
-			for (j = 0;j<10;j++)
+			for (j = 0;j<USER_COUNT;j++)
 			{
 				if (L_user[j].userid == -1)
 					break;
 			}
-			if (j == 10)
+			if (j == USER_COUNT)
 			{
-				printf("用户已满，不能插入!\n");
+				printf("Can't insert!\n");
 				continue;
 			}
-			//读取用户输入信息
 			printf("Please input user name:");
 			scanf("%s", &tempuser);
 			printf("Please input password:");
 			scanf("%s", &temppass);
 			printf("Please input group(1,2,3):");
 			scanf("%d", &tempgroup);
-			//验证用户输入信息正确与否
 			if (tempgroup<1 || tempgroup>3)
 			{
 				printf("Group error! Input Denied!\n");
 				continue;
 			}
-			//将用户信息添加
 			L_user[j].userid = j;
 			strcpy(L_user[j].username, tempuser);
 			strcpy(L_user[j].password, temppass);
 			L_user[j].group = tempgroup;
 			L_user[j].level = 0;
 		}
-		//删除用户信息
 		if (f == 3)
 		{
 			printf("Please user Id deleted：");
 			scanf("%d", &tempuid);
-			//验证用户输入的id是否正确
-			if (tempuid<0 || tempuid>9)
+			if (tempuid<0 || tempuid>USER_COUNT-1)
 			{
 				printf(E15);
 				continue;
 			}
-			//超级管理员不可删除
 			if (tempuid == 0)
 			{
 				printf("Super administrator can't delete！\n");
 				continue;
 			}
-			//保存用户的各种信息
 			L_user[tempuid].userid = -1;
 			strcpy(L_user[tempuid].username, "");
 			strcpy(L_user[tempuid].password, "");
@@ -1444,10 +1437,10 @@ void manage_user()
 	}
 }
 
-void str2stack(SqStack &s);     //输入文件路径，转化成对应的栈路径存储
-int findtreeinode(SqStack S, FTreepoint T, FTreepoint &p);     //根据路径找到对应节点
+void str2stack(SqStack &s);
+int findtreeinode(SqStack S, FTreepoint T, FTreepoint &p);
 
-															   //硬链接函数
+//h_link
 void h_link(char filename[])
 {
 	SqStack s;
@@ -1459,7 +1452,7 @@ void h_link(char filename[])
 		printf(E20);
 		return;
 	}
-	if (p->lchild->rchild == NULL)   //说明当前只有一个文件
+	if (p->lchild->rchild == NULL)
 	{
 		path_tnode(cur_dir, L_Ftree, p);
 		p2 = p->lchild;
@@ -1476,12 +1469,11 @@ void h_link(char filename[])
 
 		}
 	}
-	else    //有多个文件
+	else 
 	{
 		p2 = p->lchild;
-		if ((strcmp(p2->data.file_name, filename) == 0) && (file_inode[p2->data.dir_inode].file_style == 1))  //删除第一个文件
+		if ((strcmp(p2->data.file_name, filename) == 0) && (file_inode[p2->data.dir_inode].file_style == 1))
 		{
-			//检查系统打开表是否有这个文件，有则不能删除
 			for (int j = 0;j<200;j++)
 			{
 				if (sys_open_table[j].f_inode == p2->data.dir_inode)
@@ -1500,7 +1492,6 @@ void h_link(char filename[])
 				if ((strcmp(p->rchild->data.file_name, filename) == 0) && (file_inode[p->rchild->data.dir_inode].file_style == 1))  //存在同名文件
 				{
 					p2 = p->rchild;flag = 1;
-					//检查系统打开表是否有这个文件，有则不能删除
 					for (int j = 0;j<200;j++)
 					{
 						if (sys_open_table[j].f_inode == p2->data.dir_inode)
@@ -1514,42 +1505,41 @@ void h_link(char filename[])
 			}
 		}
 	}
-	//权限检测，p2为当前删除的文件节点
 	if (flag == 0) { printf(E20); return; }
 
-	if (cur_user.userid == file_inode[p2->data.dir_inode].file_userid)     //属主
+	if (cur_user.userid == file_inode[p2->data.dir_inode].file_userid) 
 	{
 		if (file_inode[p2->data.dir_inode].file_mode[1] == 1)
 		{
 			str2stack(s);
-			findtreeinode(s, L_Ftree, p4);     //根据路径找到对应节点
+			findtreeinode(s, L_Ftree, p4);
 			if (p4 == NULL) printf(E14);
-			if (file_inode[p2->data.dir_inode].file_length>0)  //该文件原来有内容则删除
+			if (file_inode[p2->data.dir_inode].file_length>0)
 			{
 				free_disk(p2->data.dir_inode);
 			}
-			file_inode[p2->data.dir_inode].inode_number = -1; //原来inode删除
-			p2->data.dir_inode = p4->data.dir_inode;         //赋予新的inode
-			file_inode[p4->data.dir_inode].file_icount++;  //硬链接加一
+			file_inode[p2->data.dir_inode].inode_number = -1; 
+			p2->data.dir_inode = p4->data.dir_inode; 
+			file_inode[p4->data.dir_inode].file_icount++;
 
 		}
 		else printf(E12);
 
 	}
-	else if (cur_user.group == file_inode[p2->data.dir_inode].file_groupid)   //同组
+	else if (cur_user.group == file_inode[p2->data.dir_inode].file_groupid) 
 	{
 		if (file_inode[p2->data.dir_inode].file_mode[4] == 1)
 		{
 			str2stack(s);
-			findtreeinode(s, L_Ftree, p4);     //根据路径找到对应节点
+			findtreeinode(s, L_Ftree, p4);
 			if (p4 == NULL) printf(E14);
-			if (file_inode[p2->data.dir_inode].file_length>0)  //该文件原来有内容则删除
+			if (file_inode[p2->data.dir_inode].file_length>0)
 			{
 				free_disk(p2->data.dir_inode);
 			}
-			file_inode[p2->data.dir_inode].inode_number = -1; //原来inode删除
-			p2->data.dir_inode = p4->data.dir_inode;         //赋予新的inode
-			file_inode[p4->data.dir_inode].file_icount++;  //硬链接加一
+			file_inode[p2->data.dir_inode].inode_number = -1;
+			p2->data.dir_inode = p4->data.dir_inode;
+			file_inode[p4->data.dir_inode].file_icount++;
 		}
 		else printf(E12);
 
@@ -1559,7 +1549,7 @@ void h_link(char filename[])
 		if (file_inode[p2->data.dir_inode].file_mode[7] == 1)
 		{
 			str2stack(s);
-			findtreeinode(s, L_Ftree, p4);     //根据路径找到对应节点
+			findtreeinode(s, L_Ftree, p4);
 			if (p4 == NULL) printf(E14);
 			if (file_inode[p2->data.dir_inode].file_length>0)  //delete file content
 			{
@@ -1580,7 +1570,7 @@ void h_link(char filename[])
 	WriteToFile(fp1);
 }
 
-void file2str(int a, char buff[], int n)   //a为inode号，buff为文件内容存放数组
+void file2str(int a, char buff[], int n)
 {
 	n = 0;
 	int b = file_inode[a].file_length, i;
@@ -1751,6 +1741,7 @@ void do_file(char buff[])
 	findtreeinode(s, L_Ftree, p);
 	r_f(p->data.dir_inode);
 }
+
 //软连接函数
 void s_link(char filename[])
 {

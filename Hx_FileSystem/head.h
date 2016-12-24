@@ -13,6 +13,7 @@
 #include <math.h>
 #include <fstream>
 #include <conio.h> 
+#include <time.h>
 
 #include "settings.h"
 #include "expections.h"
@@ -82,6 +83,7 @@ typedef struct{
 	int file_address[DATA_COUNT];	//addressing, 3 level indirect addressing
 	int file_icount;		//link, directory doesn't have hard link, but file does
 	char dir_name[DIR_NAME_LENGTH];		//parent directory
+	char time[64];
 } inode;
 
 /**
