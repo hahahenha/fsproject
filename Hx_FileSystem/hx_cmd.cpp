@@ -3,7 +3,7 @@
 * All rights reserved.
 * Project name：Simple File System
 * Programmer：Randolph Han
-* Finish：2016.12.11-2016.12.31
+* Finish：2016.12.11-2016.12.25
 *
 */
 #include "head.h"
@@ -56,15 +56,17 @@ void read_file(char tmp[]);		//read a file
 void write_file(char tmp[]);	//write a file
 void close_file(char tmp[]);	//close a file
 void delete_file(char tmp[]);	//delete a file
+void copy_file(char tmp[]);		//copy a file
 void show_info();				//show system information
 void logout(FILE *fp);			//logout
 int change_user(FILE *fp, char tmp[]);	//change user
 void change_mode(char tmp[]);	//chang file mode
+void change_owner(char filename[]);//change file owner
+void change_group(char filename[]);//change file group
 void manage_user();				//user management
 void h_link(char tmp[]);		//hard link
 void s_link(char tmp[]);		//soft link
 void rename(char tmp[]);		//rename a file
-void relogin();					//multiple users
 
 //path
 int InitStack(SqStack &S);		//Init path
@@ -91,29 +93,36 @@ int cul_num_systable();				//system open file number
 void InsertUserTable(int a, int i); //add a file to user open table
 void DelUserTable(int a, int i);	//delete a file from user open table
 
+void change_pwd();					//change password
+
 void help(){
 	printf("System command:\n");
 	printf("\t01.Exit system....................................(exit)\n");
 	printf("\t02.Show help information..........................(help)\n");
-	printf("\t03.File list of current directory...................(ls)\n");
-	printf("\t04.Enter the specified directory..........(cd + dirname)\n");
-	printf("\t05.Return last directory..........................(cd..)\n");
-	printf("\t06.Create a new directory..............(mkdir + dirname)\n");
-	printf("\t07.Delete the directory................(rmdir + dirname)\n");
-	printf("\t08.Create a new file....................(create + fname)\n");
-	printf("\t09.Open a file............................(open + fname)\n");
-	printf("\t10.Read the file..........................(read + fname)\n");
-	printf("\t11.Write the file........................(write + fname)\n");
-	printf("\t12.Close a file..........................(close + fname)\n");
-	printf("\t13.Delete a file............................(rm + fname)\n");
-	printf("\t14.System information view........................(info)\n");
-	printf("\t15.Close the current user.......................(logout)\n");
-	printf("\t16.Change the current user...............(su + username)\n");
-	printf("\t17.Change the mode of a file.............(chmod + fname)\n");
-	printf("\t18.Rename a file............................(mv + fname)\n");
-	printf("\t19.硬链接................................(hlink + fname)\n");
-	printf("\t20.软链接................................(slink + fname)\n");
-	printf("\t21.User Management Menu..........................(Muser)\n");
+	printf("\t03.Show current directory..........................(pwd)\n");
+	printf("\t04.File list of current directory...................(ls)\n");
+	printf("\t05.Enter the specified directory..........(cd + dirname)\n");
+	printf("\t06.Return last directory..........................(cd..)\n");
+	printf("\t07.Create a new directory..............(mkdir + dirname)\n");
+	printf("\t08.Delete the directory................(rmdir + dirname)\n");
+	printf("\t09.Create a new file....................(create + fname)\n");
+	printf("\t10.Open a file............................(open + fname)\n");
+	printf("\t11.Read the file...........................(cat + fname)\n");
+	printf("\t12.Write the file........................(write + fname)\n");
+	printf("\t13.Copy a file..............................(cp + fname)\n");
+	printf("\t14.Close a file..........................(close + fname)\n");
+	printf("\t15.Delete a file............................(rm + fname)\n");
+	printf("\t16.System information view........................(info)\n");
+	printf("\t17.Close the current user.......................(logout)\n");
+	printf("\t18.Change the current user...............(su + username)\n");
+	printf("\t19.Change the mode of a file.............(chmod + fname)\n");
+	printf("\t20.Change the user of a file.............(chown + fname)\n");
+	printf("\t21.Change the group of a file............(chgrp + fname)\n");
+	printf("\t22.Rename a file............................(mv + fname)\n");
+	printf("\t23.hard link.............................(hlink + fname)\n");
+	printf("\t24.soft link.............................(slink + fname)\n");
+	printf("\t25.Change password..............................(passwd)\n");
+	printf("\t26.User Management Menu..........................(Muser)\n");
 }
 
 
@@ -162,11 +171,11 @@ int login(){
 		}
 		//username or password error
 		if (i = USER_COUNT)
-			printf("\nUsername or password error!\n");
+			printf(E23);
 	}
 	//exit system
 	if (count >= TRY_NUM){
-		printf("\nYou can't try any more, system will be shutdown...\n");
+		printf(E24);
 		return 0;
 	}
 	return 0;
@@ -549,8 +558,10 @@ void delete_file(char filename[]){
 			}
 		}
 		if ((strcmp(p2->data.file_name, filename) == 0) && (file_inode[p2->data.dir_inode].file_style == 1)){  //delete the first file
-		
-			if (file_inode[p2->data.dir_inode].file_length>0)
+			if (file_inode[p2->data.dir_inode].file_icount > 0) {
+				file_inode[p2->data.dir_inode].file_icount--;
+			}
+			else if (file_inode[p2->data.dir_inode].file_length>0)
 			{
 				free_disk(p2->data.dir_inode);
 			}
@@ -1349,6 +1360,122 @@ void change_mode(char filename[])
 	}
 }
 
+//change file's owner
+void change_owner(char filename[])
+{
+	int a;     //inode number
+	FTreepoint p = NULL, p2 = NULL;
+	path_tnode(cur_dir, L_Ftree, p);
+	if (p->lchild == NULL)
+	{
+		printf(E14);
+	}
+	else
+	{
+		p = p->lchild;
+		while (p != NULL)
+		{
+			//
+			if ((strcmp(p->data.file_name, filename) == 0) && (file_inode[p->data.dir_inode].file_style == 1))
+			{
+				a = p->data.dir_inode;
+				int i = 0;
+				for (i = 0;i < SYSTEM_ALLOW_OPEN_COUNT;i++)
+				{
+					if (sys_open_table[i].f_inode == a)
+					{
+						break;
+					}
+				}
+				if (i == SYSTEM_ALLOW_OPEN_COUNT)
+				{
+					printf(E6);
+					return;
+				}
+				if (cur_user.userid == file_inode[a].file_userid)
+				{
+					printf("Please input user name:");
+					char str[USER_NAME_LENGTH];
+					scanf("%s", str);
+					for (i = 0; i < USER_COUNT; i++) {
+						if (strcmp(L_user[i].username, str) == 0) {
+							break;
+						}
+					}
+					if (i == USER_COUNT) {
+						printf(E15);
+						return;
+					}
+					file_inode[a].file_userid = L_user[i].userid;
+					file_inode[a].file_groupid = L_user[i].group;
+					time_t t = time(0);
+					strftime(file_inode[a].time, sizeof(file_inode[a].time), "%Y/%m/%d %X %A %jday of current year %z", localtime(&t));
+					//puts(file_inode[a].time);
+					return;
+				}
+				else printf(E18);
+			}
+			p = p->rchild;
+		}
+		printf(E14);
+	}
+}
+
+//change file's group
+void change_group(char filename[])
+{
+	int a;     //inode number
+	FTreepoint p = NULL, p2 = NULL;
+	path_tnode(cur_dir, L_Ftree, p);
+	if (p->lchild == NULL)
+	{
+		printf(E14);
+	}
+	else
+	{
+		p = p->lchild;
+		while (p != NULL)
+		{
+			//
+			if ((strcmp(p->data.file_name, filename) == 0) && (file_inode[p->data.dir_inode].file_style == 1))
+			{
+				a = p->data.dir_inode;
+				int i = 0;
+				for (i = 0;i < SYSTEM_ALLOW_OPEN_COUNT;i++)
+				{
+					if (sys_open_table[i].f_inode == a)
+					{
+						break;
+					}
+				}
+				if (i == SYSTEM_ALLOW_OPEN_COUNT)
+				{
+					printf(E6);
+					return;
+				}
+				if (cur_user.userid == file_inode[a].file_userid)
+				{
+					printf("Please input group id:");
+					int gid;
+					scanf("%d", &gid);
+					if (gid < 0 || gid > 3) {
+						printf(E22);
+						return;
+					}
+					file_inode[a].file_groupid = gid;
+					time_t t = time(0);
+					strftime(file_inode[a].time, sizeof(file_inode[a].time), "%Y/%m/%d %X %A %jday of current year %z", localtime(&t));
+					//puts(file_inode[a].time);
+					return;
+				}
+				else printf(E18);
+			}
+			p = p->rchild;
+		}
+		printf(E14);
+	}
+}
+
 //user management
 void manage_user()
 {
@@ -1362,8 +1489,8 @@ void manage_user()
 	printf("Welcome to user management!\n");
 	int i, j;
 	int f;
-	char tempuser[10];
-	char temppass[10];
+	char tempuser[2*USER_NAME_LENGTH];
+	char temppass[2*USER_PASSWORD_LENGTH];
 	int tempgroup;
 	int tempuid;
 	while (1)
@@ -1401,7 +1528,21 @@ void manage_user()
 			printf("Please input user name:");
 			scanf("%s", &tempuser);
 			printf("Please input password:");
-			scanf("%s", &temppass);
+			j = 0;
+			//get password
+			while ((temppass[j] = getch()) != '\r') {
+				if (temppass[j] == '\b') {
+					printf("\b \b");
+					temppass[j--] = '\0';
+					temppass[j] = '\0';
+				}
+				else {
+					printf("*");
+					j++;
+				}
+			}
+			temppass[j] = '\0';
+			printf("\n");
 			printf("Please input group(1,2,3):");
 			scanf("%d", &tempgroup);
 			if (tempgroup<1 || tempgroup>3)
@@ -1444,7 +1585,7 @@ int findtreeinode(SqStack S, FTreepoint T, FTreepoint &p);
 void h_link(char filename[])
 {
 	SqStack s;
-	FTreepoint p = NULL, p2 = NULL, p3, p4;
+	FTreepoint p = NULL, p2 = NULL, p4;
 	path_tnode(cur_dir, L_Ftree, p);
 	int flag = -1;
 	if (p->lchild == NULL)
@@ -1463,13 +1604,36 @@ void h_link(char filename[])
 				printf(E13);return;
 			}
 		}
-		if ((strcmp(p2->data.file_name, filename) == 0) && (file_inode[p2->data.dir_inode].file_style == 1))  //删除第一个文件
+		if ((strcmp(p2->data.file_name, filename) == 0) && (file_inode[p2->data.dir_inode].file_style == 1))
 		{
-			//连接操作
+			str2stack(s);
+			findtreeinode(s, L_Ftree, p4);
+			if (p4 == NULL) {
+				printf(E14);
+				return;
+			}
+			if (p4->lchild == NULL) {
+				p4->lchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->lchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			else {
+				p4 = p4->lchild;
+				while (p4->rchild != NULL) {
+					p4 = p4->rchild;
+				}
+				p4->rchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->rchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			p4->data.dir_inode = p2->data.dir_inode;
+			strcpy(p4->data.file_name, p2->data.file_name);
+
+			file_inode[p4->data.dir_inode].file_icount++;  //link count add 1
 
 		}
 	}
-	else 
+	else
 	{
 		p2 = p->lchild;
 		if ((strcmp(p2->data.file_name, filename) == 0) && (file_inode[p2->data.dir_inode].file_style == 1))
@@ -1489,9 +1653,10 @@ void h_link(char filename[])
 			while ((p != NULL) && (p->rchild != NULL))
 			{
 				flag = 0;
-				if ((strcmp(p->rchild->data.file_name, filename) == 0) && (file_inode[p->rchild->data.dir_inode].file_style == 1))  //存在同名文件
+				if ((strcmp(p->rchild->data.file_name, filename) == 0) && (file_inode[p->rchild->data.dir_inode].file_style == 1))
 				{
-					p2 = p->rchild;flag = 1;
+					p2 = p->rchild;
+					flag = 1;
 					for (int j = 0;j<200;j++)
 					{
 						if (sys_open_table[j].f_inode == p2->data.dir_inode)
@@ -1499,7 +1664,7 @@ void h_link(char filename[])
 							printf(E13);return;
 						}
 					}
-
+					break;
 				}
 				p = p->rchild;
 			}
@@ -1507,42 +1672,80 @@ void h_link(char filename[])
 	}
 	if (flag == 0) { printf(E20); return; }
 
-	if (cur_user.userid == file_inode[p2->data.dir_inode].file_userid) 
+	if (cur_user.userid == file_inode[p2->data.dir_inode].file_userid)
 	{
 		if (file_inode[p2->data.dir_inode].file_mode[1] == 1)
 		{
 			str2stack(s);
 			findtreeinode(s, L_Ftree, p4);
-			if (p4 == NULL) printf(E14);
-			if (file_inode[p2->data.dir_inode].file_length>0)
-			{
-				free_disk(p2->data.dir_inode);
+			if (p4 == NULL) {
+				printf(E14);
+				return;
 			}
-			file_inode[p2->data.dir_inode].inode_number = -1; 
-			p2->data.dir_inode = p4->data.dir_inode; 
-			file_inode[p4->data.dir_inode].file_icount++;
+			if (p4->lchild == NULL) {
+				p4->lchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->lchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			else {
+				p4 = p4->lchild;
+				while (p4->rchild != NULL) {
+					p4 = p4->rchild;
+				}
+				p4->rchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->rchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			p4->data.dir_inode = p2->data.dir_inode;
+			strcpy(p4->data.file_name, p2->data.file_name);
+
+			//file_inode[p2->data.dir_inode].inode_number = -1;		//inode number
+			//clear_inode_del(p2);
+
+			file_inode[p4->data.dir_inode].file_icount++;  //link count add 1
 
 		}
-		else printf(E12);
-
+		else {
+			printf(E12);
+			return;
+		}
 	}
-	else if (cur_user.group == file_inode[p2->data.dir_inode].file_groupid) 
+	else if (cur_user.group == file_inode[p2->data.dir_inode].file_groupid)
 	{
 		if (file_inode[p2->data.dir_inode].file_mode[4] == 1)
 		{
 			str2stack(s);
 			findtreeinode(s, L_Ftree, p4);
-			if (p4 == NULL) printf(E14);
-			if (file_inode[p2->data.dir_inode].file_length>0)
-			{
-				free_disk(p2->data.dir_inode);
+			if (p4 == NULL) {
+				printf(E14);
+				return;
 			}
-			file_inode[p2->data.dir_inode].inode_number = -1;
-			p2->data.dir_inode = p4->data.dir_inode;
-			file_inode[p4->data.dir_inode].file_icount++;
-		}
-		else printf(E12);
+			if (p4->lchild == NULL) {
+				p4->lchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->lchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			else {
+				p4 = p4->lchild;
+				while (p4->rchild != NULL) {
+					p4 = p4->rchild;
+				}
+				p4->rchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->rchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			p4->data.dir_inode = p2->data.dir_inode;
+			strcpy(p4->data.file_name, p2->data.file_name);
 
+			//file_inode[p2->data.dir_inode].inode_number = -1;		//inode number
+			//clear_inode_del(p2);
+
+			file_inode[p4->data.dir_inode].file_icount++;  //link count add 1
+		}
+		else {
+			printf(E12);
+			return;
+		}
 	}
 	else
 	{
@@ -1550,168 +1753,292 @@ void h_link(char filename[])
 		{
 			str2stack(s);
 			findtreeinode(s, L_Ftree, p4);
-			if (p4 == NULL) printf(E14);
-			if (file_inode[p2->data.dir_inode].file_length>0)  //delete file content
-			{
-				free_disk(p2->data.dir_inode);
+			if (p4 == NULL) {
+				printf(E14);
+				return;
 			}
-			file_inode[p2->data.dir_inode].inode_number = -1; //delete inode
-			p2->data.dir_inode = p4->data.dir_inode;         //new inode
-			file_inode[p4->data.dir_inode].file_icount++;  //hard link count add 1
-		}
-		else printf(E12);
+			if (p4->lchild == NULL) {
+				p4->lchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->lchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			else {
+				p4 = p4->lchild;
+				while (p4->rchild != NULL) {
+					p4 = p4->rchild;
+				}
+				p4->rchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->rchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			p4->data.dir_inode = p2->data.dir_inode;
+			strcpy(p4->data.file_name, p2->data.file_name);
 
+			//file_inode[p2->data.dir_inode].inode_number = -1;		//inode number
+			//clear_inode_del(p2);
+
+			file_inode[p4->data.dir_inode].file_icount++;  //link count add 1
+		}
+		else {
+			printf(E12);
+			return;
+		}
 	}
 	if (p2 == NULL) { printf(E20); return; }
 	int i = 0;
 	clear_dir(file_dir);
 	Tree_to_dir(i, file_dir, L_Ftree->lchild);
-	FILE *fp1;
+	FILE *fp1 = new FILE();
 	WriteToFile(fp1);
 }
 
-void file2str(int a, char buff[], int n)
+//s_link
+void s_link(char filename[])
 {
-	n = 0;
-	int b = file_inode[a].file_length, i;
-	if (b == 0)
+	SqStack s;
+	FTreepoint p = NULL, p2 = NULL, p3, p4;
+	path_tnode(cur_dir, L_Ftree, p);
+	int flag = -1;
+	if (p->lchild == NULL)
 	{
-		printf("该软连接没有内容！请先输入内容！\n");
+		printf(E20);
 		return;
 	}
-	if (b<13)
+	if (p->lchild->rchild == NULL)
 	{
-		for (i = 0;i<b;i++)
+		path_tnode(cur_dir, L_Ftree, p);
+		p2 = p->lchild;
+		for (int j = 0;j<200;j++)
 		{
-			for (int j = 0;j<10;j++)
+			if (sys_open_table[j].f_inode == p2->data.dir_inode)
 			{
-				if (phy[file_inode[a].file_address[i]].p[j] == 0) return;
-				buff[n] = phy[file_inode[a].file_address[i]].p[j];
-				n++;
+				printf(E13);return;
 			}
+		}
+		if ((strcmp(p2->data.file_name, filename) == 0) && (file_inode[p2->data.dir_inode].file_style == 1))
+		{
+			str2stack(s);
+			findtreeinode(s, L_Ftree, p4);
+			if (p4 == NULL) {
+				printf(E14);
+				return;
+			}
+			if (p4->lchild == NULL) {
+				p4->lchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->lchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			else {
+				p4 = p4->lchild;
+				while (p4->rchild != NULL) {
+					p4 = p4->rchild;
+				}
+				p4->rchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->rchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			int a = find_free_inode();
+			p4->data.dir_inode = a;
+			strcpy(p4->data.file_name, p2->data.file_name);
+
+			file_inode[a].inode_number = file_inode[p2->data.dir_inode].inode_number;
+			file_inode[a].file_style = 1;
+			file_inode[a].file_length = file_inode[p2->data.dir_inode].file_length;
+			strcpy(file_inode[a].file_mode, file_inode[p2->data.dir_inode].file_mode);
+			file_inode[a].file_userid = file_inode[p2->data.dir_inode].file_userid;
+			file_inode[a].file_groupid = file_inode[p2->data.dir_inode].file_groupid;
+			for (int i = 0; i < DATA_COUNT; i++) {
+				file_inode[a].file_address[i] = file_inode[p2->data.dir_inode].file_address[i];
+			}
+			file_inode[a].file_icount = file_inode[p2->data.dir_inode].file_icount + 1;
+			strcpy(file_inode[a].dir_name, file_inode[p2->data.dir_inode].dir_name);
+			strcpy(file_inode[a].time, file_inode[p2->data.dir_inode].time);
 		}
 	}
 	else
 	{
-		for (int i = 0;i<12;i++)
+		p2 = p->lchild;
+		if ((strcmp(p2->data.file_name, filename) == 0) && (file_inode[p2->data.dir_inode].file_style == 1))
 		{
-			for (int j = 0;j<10;j++)
+			for (int j = 0;j<200;j++)
 			{
-				if (phy[file_inode[a].file_address[i]].p[j] == 0) return;
-				buff[n] = phy[file_inode[a].file_address[i]].p[j];n++;
+				if (sys_open_table[j].f_inode == p2->data.dir_inode)
+				{
+					printf(E13);return;
+				}
+			}
+
+		}
+		else
+		{
+			p = p->lchild;
+			while ((p != NULL) && (p->rchild != NULL))
+			{
+				flag = 0;
+				if ((strcmp(p->rchild->data.file_name, filename) == 0) && (file_inode[p->rchild->data.dir_inode].file_style == 1))
+				{
+					p2 = p->rchild;
+					flag = 1;
+					for (int j = 0;j<200;j++)
+					{
+						if (sys_open_table[j].f_inode == p2->data.dir_inode)
+						{
+							printf(E13);return;
+						}
+					}
+					break;
+				}
+				p = p->rchild;
 			}
 		}
 	}
-	if (b >= 13)
+	if (flag == 0) { printf(E20); return; }
+
+	if (cur_user.userid == file_inode[p2->data.dir_inode].file_userid)
 	{
-		//一次间接寻址
-		int f1[2];
-		char b1[5], b2[5];
-		for (i = 0;i<5;i++)
+		if (file_inode[p2->data.dir_inode].file_mode[1] == 1)
 		{
-			b1[i] = phy[file_inode[a].file_address[12]].p[i];
-			b2[i] = phy[file_inode[a].file_address[12]].p[i + 5];
-		}
-		f1[0] = atoi(b1);f1[1] = atoi(b2);
-		for (i = 0;i<2;i++)
-		{
-			for (int j = 0;j<10;j++)
-			{
-				if (phy[f1[i]].p[j] == 0) return;
-				buff[n] = phy[f1[i]].p[j];n++;
+			str2stack(s);
+			findtreeinode(s, L_Ftree, p4);
+			if (p4 == NULL) {
+				printf(E14);
+				return;
 			}
+			if (p4->lchild == NULL) {
+				p4->lchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->lchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			else {
+				p4 = p4->lchild;
+				while (p4->rchild != NULL) {
+					p4 = p4->rchild;
+				}
+				p4->rchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->rchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			int a = find_free_inode();
+			p4->data.dir_inode = a;
+			strcpy(p4->data.file_name, p2->data.file_name);
+
+			file_inode[a].inode_number = file_inode[p2->data.dir_inode].inode_number;
+			file_inode[a].file_style = file_inode[p2->data.dir_inode].file_style;
+			file_inode[a].file_length = file_inode[p2->data.dir_inode].file_length;
+			strcpy(file_inode[a].file_mode, file_inode[p2->data.dir_inode].file_mode);
+			file_inode[a].file_userid = file_inode[p2->data.dir_inode].file_userid;
+			file_inode[a].file_groupid = file_inode[p2->data.dir_inode].file_groupid;
+			for (int i = 0; i < DATA_COUNT; i++) {
+				file_inode[a].file_address[i] = file_inode[p2->data.dir_inode].file_address[i];
+			}
+			file_inode[a].file_icount = file_inode[p2->data.dir_inode].file_icount + 1;
+			strcpy(file_inode[a].dir_name, file_inode[p2->data.dir_inode].dir_name);
+			strcpy(file_inode[a].time, file_inode[p2->data.dir_inode].time);
+
+		}
+		else {
+			printf(E12);
+			return;
 		}
 	}
-	if (b >= 14)
+	else if (cur_user.group == file_inode[p2->data.dir_inode].file_groupid)
 	{
-		//一次间接寻址
-		int f1[2];
-		char b1[5], b_2[5];
-		for (i = 0;i<5;i++)
+		if (file_inode[p2->data.dir_inode].file_mode[4] == 1)
 		{
-			b1[i] = phy[file_inode[a].file_address[13]].p[i];
-			b_2[i] = phy[file_inode[a].file_address[13]].p[i + 5];
-		}
-		f1[0] = atoi(b1);f1[1] = atoi(b_2);
-
-		//二次间接寻址
-		int f2[4];
-		char b2[4][5];
-		for (int j = 0;j<5;j++)
-		{
-			b2[0][j] = phy[f1[0]].p[j];
-			b2[1][j] = phy[f1[0]].p[j + 5];
-			b2[2][j] = phy[f1[1]].p[j];
-			b2[3][j] = phy[f1[1]].p[j + 5];
-		}
-		for (i = 0;i<4;i++)
-		{
-			f2[i] = atoi(b2[i]);
-		}
-
-		for (i = 0;i<4;i++)
-		{
-			for (int j = 0;j<10;j++)
-			{
-				if (phy[f2[i]].p[j] == 0) return;
-				buff[n] = phy[f2[i]].p[j];n++;
+			str2stack(s);
+			findtreeinode(s, L_Ftree, p4);
+			if (p4 == NULL) {
+				printf(E14);
+				return;
 			}
+			if (p4->lchild == NULL) {
+				p4->lchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->lchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			else {
+				p4 = p4->lchild;
+				while (p4->rchild != NULL) {
+					p4 = p4->rchild;
+				}
+				p4->rchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->rchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			int a = find_free_inode();
+			p4->data.dir_inode = a;
+			strcpy(p4->data.file_name, p2->data.file_name);
+
+			file_inode[a].inode_number = file_inode[p2->data.dir_inode].inode_number;
+			file_inode[a].file_style = 1;
+			file_inode[a].file_length = file_inode[p2->data.dir_inode].file_length;
+			strcpy(file_inode[a].file_mode, file_inode[p2->data.dir_inode].file_mode);
+			file_inode[a].file_userid = file_inode[p2->data.dir_inode].file_userid;
+			file_inode[a].file_groupid = file_inode[p2->data.dir_inode].file_groupid;
+			for (int i = 0; i < DATA_COUNT; i++) {
+				file_inode[a].file_address[i] = file_inode[p2->data.dir_inode].file_address[i];
+			}
+			file_inode[a].file_icount = file_inode[p2->data.dir_inode].file_icount + 1;
+			strcpy(file_inode[a].dir_name, file_inode[p2->data.dir_inode].dir_name);
+			strcpy(file_inode[a].time, file_inode[p2->data.dir_inode].time);
+		}
+		else {
+			printf(E12);
+			return;
 		}
 	}
-	if (b >= 15)
+	else
 	{
-		//一次间接寻址
-		int f1[2];
-		char b1[5], b_2[5];
-		for (i = 0;i<5;i++)
+		if (file_inode[p2->data.dir_inode].file_mode[7] == 1)
 		{
-			b1[i] = phy[file_inode[a].file_address[14]].p[i];
-			b_2[i] = phy[file_inode[a].file_address[14]].p[i + 5];
-		}
-		f1[0] = atoi(b1);f1[1] = atoi(b_2);
-
-		int f2[4];
-		char b2[4][5];
-		for (int j = 0;j<5;j++)
-		{
-			b2[0][j] = phy[f1[0]].p[j];
-			b2[1][j] = phy[f1[0]].p[j + 5];
-			b2[2][j] = phy[f1[1]].p[j];
-			b2[3][j] = phy[f1[1]].p[j + 5];
-		}
-		for (i = 0;i<4;i++)
-		{
-			f2[i] = atoi(b2[i]);
-		}
-
-		int f3[8], j;
-		char b3[8][5];
-		for (j = 0;j<5;j++)
-		{
-			b3[0][j] = phy[f2[0]].p[j];
-			b3[1][j] = phy[f2[0]].p[j + 5];
-			b3[2][j] = phy[f2[1]].p[j];
-			b3[3][j] = phy[f2[1]].p[j + 5];
-			b3[4][j] = phy[f2[2]].p[j];
-			b3[5][j] = phy[f2[2]].p[j + 5];
-			b3[6][j] = phy[f2[3]].p[j];
-			b3[7][j] = phy[f2[3]].p[j + 5];
-		}
-		for (i = 0;i<8;i++)
-		{
-			f3[i] = atoi(b3[i]);
-		}
-
-
-		for (i = 0;i<8;i++)
-		{
-			for (int j = 0;j<10;j++)
-			{
-				if (phy[f3[i]].p[j] == 0) return;
-				buff[n] = phy[f3[i]].p[j];n++;
+			str2stack(s);
+			findtreeinode(s, L_Ftree, p4);
+			if (p4 == NULL) {
+				printf(E14);
+				return;
 			}
+			if (p4->lchild == NULL) {
+				p4->lchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->lchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			else {
+				p4 = p4->lchild;
+				while (p4->rchild != NULL) {
+					p4 = p4->rchild;
+				}
+				p4->rchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->rchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			int a = find_free_inode();
+			p4->data.dir_inode = a;
+			strcpy(p4->data.file_name, p2->data.file_name);
+
+			file_inode[a].inode_number = file_inode[p2->data.dir_inode].inode_number;
+			file_inode[a].file_style = 1;
+			file_inode[a].file_length = file_inode[p2->data.dir_inode].file_length;
+			strcpy(file_inode[a].file_mode, file_inode[p2->data.dir_inode].file_mode);
+			file_inode[a].file_userid = file_inode[p2->data.dir_inode].file_userid;
+			file_inode[a].file_groupid = file_inode[p2->data.dir_inode].file_groupid;
+			for (int i = 0; i < DATA_COUNT; i++) {
+				file_inode[a].file_address[i] = file_inode[p2->data.dir_inode].file_address[i];
+			}
+			file_inode[a].file_icount = file_inode[p2->data.dir_inode].file_icount + 1;
+			strcpy(file_inode[a].dir_name, file_inode[p2->data.dir_inode].dir_name);
+			strcpy(file_inode[a].time, file_inode[p2->data.dir_inode].time);
+		}
+		else {
+			printf(E12);
+			return;
 		}
 	}
+	if (p2 == NULL) { printf(E20); return; }
+	int i = 0;
+	clear_dir(file_dir);
+	Tree_to_dir(i, file_dir, L_Ftree->lchild);
+	FILE *fp1 = new FILE();
+	WriteToFile(fp1);
 }
 
 //do file in array
@@ -1742,63 +2069,6 @@ void do_file(char buff[])
 	r_f(p->data.dir_inode);
 }
 
-//软连接函数
-void s_link(char filename[])
-{
-	char buff[260] = { 0 };
-	int n = 0;
-	int a;     //a代表代开文件的inode号
-	FTreepoint p = NULL, p2 = NULL;
-	path_tnode(cur_dir, L_Ftree, p);
-	if (p->lchild == NULL)      //为空
-	{
-		printf(E14);
-	}
-	else   //非空
-	{
-		p = p->lchild;
-		while (p != NULL)
-		{
-			if ((strcmp(p->data.file_name, filename) == 0) && (file_inode[p->data.dir_inode].file_style == 1))
-			{
-				a = p->data.dir_inode;
-				if (cur_user.userid == file_inode[a].file_userid) 
-				{
-					if (file_inode[a].file_mode[0] == 1)
-					{
-						file2str(a, buff, n);
-						buff[n] = 0;
-						if (buff + 1 == NULL) { printf("软连接错误！\n");return; }
-						do_file(buff + 1);
-						printf("\n");
-					}
-					else printf(E12);
-				}
-				else if (cur_user.group == file_inode[a].file_groupid)
-				{
-					if (file_inode[a].file_mode[3] == 1)
-					{
-						file2str(a, buff, n);buff[n] = 0;do_file(buff + 1);	printf("\n");
-					}
-					else printf(E12);
-				}
-				else
-				{
-					if (file_inode[a].file_mode[6] == 1)
-					{
-						file2str(a, buff, n);buff[n] = 0;do_file(buff + 1);	printf("\n");
-					}
-					else printf(E12);
-				}
-
-				return;
-			}
-			p = p->rchild;
-		}
-		printf(E14);
-	}
-}
-
 //rename
 void rename(char filename[])
 {
@@ -1823,14 +2093,14 @@ void rename(char filename[])
 				p3 = p->lchild;
 				while (p3 != NULL)
 				{
-					if ((strcmp(p3->data.file_name, newfname) == 0) && (file_inode[p3->data.dir_inode].file_style == 1))  //存在同名文件
+					if ((strcmp(p3->data.file_name, newfname) == 0) && (file_inode[p3->data.dir_inode].file_style == 1))
 					{
 						printf("This name has already used^-^!\n");return;
 					}
 					p3 = p3->rchild;
 				}
 				strcpy(p2->data.file_name, newfname);
-				return;
+				break;
 			}
 			p2 = p2->rchild;
 		}
@@ -1838,6 +2108,650 @@ void rename(char filename[])
 	int i = 0;
 	clear_dir(file_dir);
 	Tree_to_dir(i, file_dir, L_Ftree->lchild);
-	FILE *fp;
+	FILE *fp = new FILE();
 	WriteToFile(fp);
+}
+
+void change_pwd() {
+	printf("Please input old password:");
+	char password[2 * USER_PASSWORD_LENGTH];
+	int i = 0;
+	//get password
+	while ((password[i] = getch()) != '\r') {
+		if (password[i] == '\b') {
+			printf("\b \b");
+			password[i--] = '\0';
+			password[i] = '\0';
+		}
+		else {
+			printf("*");
+			i++;
+		}
+	}
+	password[i] = '\0';
+	printf("\n");
+	for (i = 0;i<USER_COUNT;i++) {
+		//comfirm the username & password
+			if (L_user[i].userid == cur_user.userid) {
+				if (strcmp(password, L_user[i].password) == 0) {
+					printf("Please input new password:");
+					int j = 0;
+					//get password
+					while ((password[j] = getch()) != '\r') {
+						if (password[j] == '\b') {
+							printf("\b \b");
+							password[j--] = '\0';
+							password[j] = '\0';
+						}
+						else {
+							printf("*");
+							j++;
+						}
+					}
+					password[j] = '\0';
+					printf("\n");
+					strcpy(L_user[i].password, password);
+					SaveUsers();
+					return;
+				}
+			}
+	}
+	//username or password error
+	if (i = USER_COUNT)
+		printf(E23);
+	return;
+}
+
+void c_f(int a, char* buffer) {
+	int b = file_inode[a].file_length, i, cnt = 0;
+	if (b < DATA_COUNT - 2) {
+		for (i = 0;i < b;i++) {
+			for (int j = 0;j < 10;j++) {
+				if (phy[file_inode[a].file_address[i]].p[j] == 0) return;
+				buffer[cnt++] = phy[file_inode[a].file_address[i]].p[j];
+			}
+		}
+	}
+	else {
+		for (int i = 0;i < DATA_COUNT - 3;i++) {
+			for (int j = 0;j < 10;j++) {
+				if (phy[file_inode[a].file_address[i]].p[j] == 0) return;
+				buffer[cnt++] = phy[file_inode[a].file_address[i]].p[j];
+			}
+		}
+	}
+	if (b >= DATA_COUNT - 2) {
+		//direct addressing 
+		int f1[2];
+		char b1[5], b2[5];
+		for (i = 0;i < 5;i++) {
+			b1[i] = phy[file_inode[a].file_address[12]].p[i];
+			b2[i] = phy[file_inode[a].file_address[12]].p[i + 5];
+		}
+		f1[0] = atoi(b1);f1[1] = atoi(b2);
+		for (i = 0;i < 2;i++) {
+			for (int j = 0;j < 10;j++) {
+				if (phy[f1[i]].p[j] == 0) return;
+				buffer[cnt++] = phy[f1[i]].p[j];
+			}
+		}
+	}
+	if (b >= DATA_COUNT - 1) {
+		//first level indirect addressing 
+		int f1[2], i, j;
+		char b1[5], b_2[5];
+		for (i = 0;i < 5;i++) {
+			b1[i] = phy[file_inode[a].file_address[13]].p[i];
+			b_2[i] = phy[file_inode[a].file_address[13]].p[i + 5];
+		}
+		f1[0] = atoi(b1);f1[1] = atoi(b_2);
+
+		//second level indirect addressing
+		int f2[4];
+		char b2[4][5];
+		for (j = 0;j < 5;j++) {
+			b2[0][j] = phy[f1[0]].p[j];
+			b2[1][j] = phy[f1[0]].p[j + 5];
+			b2[2][j] = phy[f1[1]].p[j];
+			b2[3][j] = phy[f1[1]].p[j + 5];
+		}
+		for (i = 0;i < 4;i++) {
+			f2[i] = atoi(b2[i]);
+		}
+
+		for (i = 0;i < 4;i++) {
+			for (j = 0;j < 10;j++) {
+				if (phy[f2[i]].p[j] == 0) return;
+				buffer[cnt++] = phy[f2[i]].p[j];
+			}
+		}
+	}
+	if (b >= DATA_COUNT) {
+		//first level indirect addressing
+		int f1[2], i, j;
+		char b1[5], b_2[5];
+		for (i = 0;i < 5;i++) {
+			b1[i] = phy[file_inode[a].file_address[14]].p[i];
+			b_2[i] = phy[file_inode[a].file_address[14]].p[i + 5];
+		}
+		f1[0] = atoi(b1);f1[1] = atoi(b_2);
+
+		//second level indirect addressing 
+		int f2[4];
+		char b2[4][5];
+		for (j = 0;j < 5;j++) {
+			b2[0][j] = phy[f1[0]].p[j];
+			b2[1][j] = phy[f1[0]].p[j + 5];
+			b2[2][j] = phy[f1[1]].p[j];
+			b2[3][j] = phy[f1[1]].p[j + 5];
+		}
+		for (i = 0;i < 4;i++) {
+			f2[i] = atoi(b2[i]);
+		}
+
+		//third level indirect addressing 
+		int f3[8];
+		char b3[8][5];
+		for (j = 0;j < 5;j++) {
+			b3[0][j] = phy[f2[0]].p[j];
+			b3[1][j] = phy[f2[0]].p[j + 5];
+			b3[2][j] = phy[f2[1]].p[j];
+			b3[3][j] = phy[f2[1]].p[j + 5];
+			b3[4][j] = phy[f2[2]].p[j];
+			b3[5][j] = phy[f2[2]].p[j + 5];
+			b3[6][j] = phy[f2[3]].p[j];
+			b3[7][j] = phy[f2[3]].p[j + 5];
+		}
+		for (i = 0;i < 8;i++) {
+			f3[i] = atoi(b3[i]);
+		}
+
+
+		for (i = 0;i < 8;i++) {
+			for (j = 0;j < 10;j++) {
+				if (phy[f3[i]].p[j] == 0) return;
+				buffer[cnt++] = phy[f3[i]].p[j];
+			}
+		}
+	}
+}
+
+void wc_f(int a, char* buffer) {  //a:inode number
+	free_disk(a);   //clear
+	char ch;
+	int num = 0;
+	while (buffer[num] != '\0') num++;
+
+	file_inode[a].file_length = 0;
+	if (num <= 120 && num>0) {
+		if (num % 10 == 0) {
+			for (int i = 0;i<num / 10 + 1;i++) {
+				file_inode[a].file_address[i] = find_super();
+				for (int j = 0;j<10;j++) {
+					phy[find_super()].p[j] = buffer[i * 10 + j];
+				}
+				hx_superblock.phydata[find_super()] = 1;
+				file_inode[a].file_length++;
+			}
+		}
+		else {
+			for (int i = 0;i<num / 10 + 1;i++) {
+				file_inode[a].file_address[i] = find_super();
+				for (int j = 0;j<10;j++) {
+					phy[find_super()].p[j] = buffer[i * 10 + j];
+				}
+				hx_superblock.phydata[find_super()] = 1;
+				file_inode[a].file_length++;
+			}
+		}
+	}
+	else {
+		for (int i = 0;i<12;i++) {
+			file_inode[a].file_address[i] = find_super();
+			for (int j = 0;j<512;j++) {
+				phy[find_super()].p[j] = buffer[i * 10 + j];
+			}
+			hx_superblock.phydata[find_super()] = 1;
+			file_inode[a].file_length++;
+		}
+	}
+	if (num>120) {   //简化处理，直接开辟两个存储空间
+		file_inode[a].file_address[12] = find_super();
+		file_inode[a].file_length++;
+		hx_superblock.phydata[find_super()] = 1;
+		int first = find_super();
+		hx_superblock.phydata[find_super()] = 1;
+		int second = find_super();
+		hx_superblock.phydata[find_super()] = 1;
+		char buf[5] = { 0 }, buf1[5] = { 0 };
+		itoa(first, buf, 512);
+		itoa(second, buf1, 512);
+		int i;
+		for (i = 0;i<512;i++) {
+			phy[file_inode[a].file_address[12]].p[i] = buf[i];
+			phy[file_inode[a].file_address[12]].p[i + 5] = buf1[i];
+		}
+		//开始存储内容
+		for (i = 120;i<130;i++) {
+			if (i>num) {
+				break;
+			}
+			phy[first].p[i - 120] = buffer[i];
+		}
+		for (i = 130;i<140;i++) {
+			if (i>num) {
+				break;
+			}
+			phy[second].p[i - 130] = buffer[i];
+		}
+	}
+	if (num>140) {
+		file_inode[a].file_address[13] = find_super();
+		file_inode[a].file_length++;
+		hx_superblock.phydata[find_super()] = 1;
+		int first = find_super();
+		hx_superblock.phydata[find_super()] = 1;
+		int second = find_super();
+		hx_superblock.phydata[find_super()] = 1;
+		char buf[5] = { 0 }, buf1[5] = { 0 };
+		itoa(first, buf, 512);
+		itoa(second, buf1, 512);
+		//一次间接寻址
+		for (int i = 0;i<512;i++) {
+			phy[file_inode[a].file_address[13]].p[i] = buf[i];
+			phy[file_inode[a].file_address[13]].p[i + 5] = buf1[i];
+		}
+
+		int f1, f2, f3, f4, i;
+		f1 = find_super();hx_superblock.phydata[f1] = 1;
+		f2 = find_super();hx_superblock.phydata[f2] = 1;
+		f3 = find_super();hx_superblock.phydata[f3] = 1;
+		f4 = find_super();hx_superblock.phydata[f4] = 1;
+		char b1[5] = { 0 }, b2[5] = { 0 }, b3[5] = { 0 }, b4[5] = { 0 };
+		itoa(f1, b1, 512);itoa(f2, b2, 512);itoa(f3, b3, 512);itoa(f4, b4, 512);
+		//二次间接寻址
+		for (i = 0;i<5;i++)
+		{
+			phy[first].p[i] = b1[i];
+			phy[first].p[i + 5] = b2[i];
+			phy[second].p[i] = b3[i];
+			phy[second].p[i + 5] = b4[i];
+		}
+		//开始存储内容
+		for (i = 140;i<150;i++) {
+			if (i>num) {
+				break;
+			}
+			phy[f1].p[i - 140] = buffer[i];
+		}
+		for (i = 150;i<160;i++) {
+			if (i>num) {
+				break;
+			}
+			phy[f2].p[i - 150] = buffer[i];
+		}
+		for (i = 160;i<170;i++) {
+			if (i>num) {
+				break;
+			}
+			phy[f3].p[i - 160] = buffer[i];
+		}
+		for (i = 170;i<180;i++) {
+			if (i>num) {
+				break;
+			}
+			phy[f4].p[i - 170] = buffer[i];
+		}
+	}
+	if (num>180) {
+		file_inode[a].file_address[14] = find_super();
+		file_inode[a].file_length++;
+		hx_superblock.phydata[find_super()] = 1;
+		int first = find_super();
+		hx_superblock.phydata[find_super()] = 1;
+		int second = find_super();
+		hx_superblock.phydata[find_super()] = 1;
+		char buf[5] = { 0 }, buf1[5] = { 0 };
+		itoa(first, buf, 512);
+		itoa(second, buf1, 512);
+		for (int i = 0;i<5;i++) {
+			phy[file_inode[a].file_address[14]].p[i] = buf[i];
+			phy[file_inode[a].file_address[14]].p[i + 5] = buf1[i];
+		}
+
+		int f1, f2, f3, f4, i;
+		f1 = find_super();hx_superblock.phydata[f1] = 1;
+		f2 = find_super();hx_superblock.phydata[f2] = 1;
+		f3 = find_super();hx_superblock.phydata[f3] = 1;
+		f4 = find_super();hx_superblock.phydata[f4] = 1;
+		char b1[5] = { 0 }, b2[5] = { 0 }, b3[5] = { 0 }, b4[5] = { 0 };
+		itoa(f1, b1, 512);itoa(f2, b2, 512);itoa(f3, b3, 512);itoa(f4, b4, 512);
+
+		for (i = 0;i<5;i++)
+		{
+			phy[first].p[i] = b1[i];
+			phy[first].p[i + 5] = b2[i];
+			phy[second].p[i] = b3[i];
+			phy[second].p[i + 5] = b4[i];
+		}
+
+		int ff1, ff2, ff3, ff4, ff5, ff6, ff7, ff8;
+		ff1 = find_super();hx_superblock.phydata[ff1] = 1;
+		ff2 = find_super();hx_superblock.phydata[ff2] = 1;
+		ff3 = find_super();hx_superblock.phydata[ff3] = 1;
+		ff4 = find_super();hx_superblock.phydata[ff4] = 1;
+		ff5 = find_super();hx_superblock.phydata[ff5] = 1;
+		ff6 = find_super();hx_superblock.phydata[ff6] = 1;
+		ff7 = find_super();hx_superblock.phydata[ff7] = 1;
+		ff8 = find_super();hx_superblock.phydata[ff8] = 1;
+		char bb1[5] = { 0 }, bb2[5] = { 0 }, bb3[5] = { 0 }, bb4[5] = { 0 }, bb5[5] = { 0 }, bb6[5] = { 0 }, bb7[5] = { 0 }, bb8[5] = { 0 };
+		itoa(ff1, bb1, 512);itoa(ff2, bb2, 512);itoa(ff3, bb3, 512);itoa(ff4, bb4, 512);
+		itoa(ff5, bb5, 512);itoa(ff6, bb6, 512);itoa(ff7, bb7, 512);itoa(ff8, bb8, 512);
+		for (i = 0;i<5;i++) {
+			phy[f1].p[i] = bb1[i];
+			phy[f1].p[i + 5] = bb2[i];
+			phy[f2].p[i] = bb3[i];
+			phy[f2].p[i + 5] = bb4[i];
+			phy[f3].p[i] = bb5[i];
+			phy[f3].p[i + 5] = bb6[i];
+			phy[f4].p[i] = bb7[i];
+			phy[f4].p[i + 5] = bb8[i];
+		}
+
+		for (i = 180;i<190;i++) {
+			if (i>num) {
+				break;
+			}
+			phy[ff1].p[i - 180] = buffer[i];
+		}
+		for (i = 190;i<200;i++) {
+			if (i>num) {
+				break;
+			}
+			phy[ff2].p[i - 190] = buffer[i];
+		}
+		for (i = 200;i<210;i++) {
+			if (i>num) {
+				break;
+			}
+			phy[ff3].p[i - 200] = buffer[i];
+		}
+		for (i = 210;i<220;i++) {
+			if (i>num) {
+				break;
+			}
+			phy[ff4].p[i - 210] = buffer[i];
+		}
+		for (i = 220;i<230;i++) {
+			if (i>num) {
+				break;
+			}
+			phy[ff5].p[i - 220] = buffer[i];
+		}
+		for (i = 230;i<240;i++) {
+			if (i>num) {
+				break;
+			}
+			phy[ff6].p[i - 230] = buffer[i];
+		}
+		for (i = 240;i<250;i++) {
+			if (i>num) {
+				break;
+			}
+			phy[ff7].p[i - 240] = buffer[i];
+		}
+		for (i = 250;i<260;i++) {
+			if (i>num) {
+				break;
+			}
+			phy[ff8].p[i - 250] = buffer[i];
+		}
+	}
+}
+
+void copy_file(char filename[]) {
+	char buffer[FILE_BUFFER] = { 0 };
+	SqStack s;
+	FTreepoint p = NULL, p2 = NULL, p4;
+	path_tnode(cur_dir, L_Ftree, p);
+	int flag = -1;
+	if (p->lchild == NULL)
+	{
+		printf(E20);
+		return;
+	}
+	if (p->lchild->rchild == NULL)
+	{
+		path_tnode(cur_dir, L_Ftree, p);
+		p2 = p->lchild;
+		for (int j = 0;j<200;j++)
+		{
+			if (sys_open_table[j].f_inode == p2->data.dir_inode)
+			{
+				printf(E13);return;
+			}
+		}
+		if ((strcmp(p2->data.file_name, filename) == 0) && (file_inode[p2->data.dir_inode].file_style == 1))
+		{
+			c_f(p2->data.dir_inode, buffer);
+			str2stack(s);
+			findtreeinode(s, L_Ftree, p4);
+			if (p4 == NULL) {
+				printf(E14);
+				return;
+			}
+			if (p4->lchild == NULL) {
+				p4->lchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->lchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			else {
+				p4 = p4->lchild;
+				while (p4->rchild != NULL) {
+					p4 = p4->rchild;
+				}
+				p4->rchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->rchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			int a = find_free_inode();
+			p4->data.dir_inode = a;
+			strcpy(p4->data.file_name, p2->data.file_name);
+
+			file_inode[a].inode_number = file_inode[p2->data.dir_inode].inode_number;
+			file_inode[a].file_style = 1;
+			file_inode[a].file_length = file_inode[p2->data.dir_inode].file_length;
+			strcpy(file_inode[a].file_mode, file_inode[p2->data.dir_inode].file_mode);
+			file_inode[a].file_userid = file_inode[p2->data.dir_inode].file_userid;
+			file_inode[a].file_groupid = file_inode[p2->data.dir_inode].file_groupid;
+			file_inode[a].file_icount = file_inode[p2->data.dir_inode].file_icount + 1;
+			strcpy(file_inode[a].dir_name, file_inode[p2->data.dir_inode].dir_name);
+			time_t t = time(0);
+			strftime(file_inode[a].time, sizeof(file_inode[a].time), "%Y/%m/%d %X %A %jday of the current year %z", localtime(&t));
+			wc_f(a, buffer);
+		}
+	}
+	else
+	{
+		p2 = p->lchild;
+		if ((strcmp(p2->data.file_name, filename) == 0) && (file_inode[p2->data.dir_inode].file_style == 1))
+		{
+			for (int j = 0;j<200;j++)
+			{
+				if (sys_open_table[j].f_inode == p2->data.dir_inode)
+				{
+					printf(E13);return;
+				}
+			}
+
+		}
+		else
+		{
+			p = p->lchild;
+			while ((p != NULL) && (p->rchild != NULL))
+			{
+				flag = 0;
+				if ((strcmp(p->rchild->data.file_name, filename) == 0) && (file_inode[p->rchild->data.dir_inode].file_style == 1))
+				{
+					p2 = p->rchild;
+					flag = 1;
+					for (int j = 0;j<200;j++)
+					{
+						if (sys_open_table[j].f_inode == p2->data.dir_inode)
+						{
+							printf(E13);return;
+						}
+					}
+					break;
+				}
+				p = p->rchild;
+			}
+		}
+	}
+	if (flag == 0) { printf(E20); return; }
+
+	if (cur_user.userid == file_inode[p2->data.dir_inode].file_userid)
+	{
+		if (file_inode[p2->data.dir_inode].file_mode[1] == 1)
+		{
+			c_f(p2->data.dir_inode, buffer);
+			str2stack(s);
+			findtreeinode(s, L_Ftree, p4);
+			if (p4 == NULL) {
+				printf(E14);
+				return;
+			}
+			if (p4->lchild == NULL) {
+				p4->lchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->lchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			else {
+				p4 = p4->lchild;
+				while (p4->rchild != NULL) {
+					p4 = p4->rchild;
+				}
+				p4->rchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->rchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			int a = find_free_inode();
+			p4->data.dir_inode = a;
+			strcpy(p4->data.file_name, p2->data.file_name);
+
+			file_inode[a].inode_number = file_inode[p2->data.dir_inode].inode_number;
+			file_inode[a].file_style = file_inode[p2->data.dir_inode].file_style;
+			file_inode[a].file_length = file_inode[p2->data.dir_inode].file_length;
+			strcpy(file_inode[a].file_mode, file_inode[p2->data.dir_inode].file_mode);
+			file_inode[a].file_userid = file_inode[p2->data.dir_inode].file_userid;
+			file_inode[a].file_groupid = file_inode[p2->data.dir_inode].file_groupid;
+			file_inode[a].file_icount = file_inode[p2->data.dir_inode].file_icount + 1;
+			strcpy(file_inode[a].dir_name, file_inode[p2->data.dir_inode].dir_name);
+			time_t t = time(0);
+			strftime(file_inode[a].time, sizeof(file_inode[a].time), "%Y/%m/%d %X %A %jday of the current year %z", localtime(&t));
+			wc_f(a, buffer);
+		}
+		else {
+			printf(E12);
+			return;
+		}
+	}
+	else if (cur_user.group == file_inode[p2->data.dir_inode].file_groupid)
+	{
+		if (file_inode[p2->data.dir_inode].file_mode[4] == 1)
+		{
+			c_f(p2->data.dir_inode, buffer);
+			str2stack(s);
+			findtreeinode(s, L_Ftree, p4);
+			if (p4 == NULL) {
+				printf(E14);
+				return;
+			}
+			if (p4->lchild == NULL) {
+				p4->lchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->lchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			else {
+				p4 = p4->lchild;
+				while (p4->rchild != NULL) {
+					p4 = p4->rchild;
+				}
+				p4->rchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->rchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			int a = find_free_inode();
+			p4->data.dir_inode = a;
+			strcpy(p4->data.file_name, p2->data.file_name);
+
+			file_inode[a].inode_number = file_inode[p2->data.dir_inode].inode_number;
+			file_inode[a].file_style = 1;
+			file_inode[a].file_length = file_inode[p2->data.dir_inode].file_length;
+			strcpy(file_inode[a].file_mode, file_inode[p2->data.dir_inode].file_mode);
+			file_inode[a].file_userid = file_inode[p2->data.dir_inode].file_userid;
+			file_inode[a].file_groupid = file_inode[p2->data.dir_inode].file_groupid;
+			file_inode[a].file_icount = file_inode[p2->data.dir_inode].file_icount + 1;
+			strcpy(file_inode[a].dir_name, file_inode[p2->data.dir_inode].dir_name);
+			time_t t = time(0);
+			strftime(file_inode[a].time, sizeof(file_inode[a].time), "%Y/%m/%d %X %A %jday of the current year %z", localtime(&t));
+			wc_f(a, buffer);
+		}
+		else {
+			printf(E12);
+			return;
+		}
+	}
+	else
+	{
+		if (file_inode[p2->data.dir_inode].file_mode[7] == 1)
+		{
+			c_f(p2->data.dir_inode, buffer);
+			str2stack(s);
+			findtreeinode(s, L_Ftree, p4);
+			if (p4 == NULL) {
+				printf(E14);
+				return;
+			}
+			if (p4->lchild == NULL) {
+				p4->lchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->lchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			else {
+				p4 = p4->lchild;
+				while (p4->rchild != NULL) {
+					p4 = p4->rchild;
+				}
+				p4->rchild = (FTreepoint)malloc(sizeof(FTree));
+				p4 = p4->rchild;
+				p4->lchild = p4->rchild = NULL;
+			}
+			int a = find_free_inode();
+			p4->data.dir_inode = a;
+			strcpy(p4->data.file_name, p2->data.file_name);
+
+			file_inode[a].inode_number = file_inode[p2->data.dir_inode].inode_number;
+			file_inode[a].file_style = 1;
+			file_inode[a].file_length = file_inode[p2->data.dir_inode].file_length;
+			strcpy(file_inode[a].file_mode, file_inode[p2->data.dir_inode].file_mode);
+			file_inode[a].file_userid = file_inode[p2->data.dir_inode].file_userid;
+			file_inode[a].file_groupid = file_inode[p2->data.dir_inode].file_groupid;
+			file_inode[a].file_icount = file_inode[p2->data.dir_inode].file_icount + 1;
+			strcpy(file_inode[a].dir_name, file_inode[p2->data.dir_inode].dir_name);
+			time_t t = time(0);
+			strftime(file_inode[a].time, sizeof(file_inode[a].time), "%Y/%m/%d %X %A %jday of the current year %z", localtime(&t));
+			wc_f(a, buffer);
+		}
+		else {
+			printf(E12);
+			return;
+		}
+	}
+	if (p2 == NULL) { printf(E20); return; }
+	int i = 0;
+	clear_dir(file_dir);
+	Tree_to_dir(i, file_dir, L_Ftree->lchild);
+	FILE *fp1 = new FILE();
+	WriteToFile(fp1);
 }

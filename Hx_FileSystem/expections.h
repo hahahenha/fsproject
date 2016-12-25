@@ -3,7 +3,7 @@
 * All rights reserved.
 * Project name£ºSimple File System
 * Programmer£ºRandolph Han
-* Finish£º2016.12.18
+* Finish£º2016.12.18-2016.12.25
 *
 */
 #pragma once
@@ -29,3 +29,7 @@
 #define E19 "Access Denied!\n"
 #define E20 "Input file name error! Please check out!\n"
 #define E21 "Input error!\nTry help to get full information\n"
+#define E22 "Group not exist!\n"
+#define E23 "\nUsername or password error!\n"
+#define E24 "\nYou can't try any more, system will be shutdown...\n"
+#define E23 "\nPassword error!\n"

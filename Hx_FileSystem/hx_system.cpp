@@ -31,14 +31,6 @@ int cul_num_inodetable();		//culate the number of active inode
 void InsertUserTable(int a, int i); //insert the a number inode to user open table
 void DelUserTable(int a, int i);  //”√delete inode from user open table
 
-
-//system function ??
-void InsertTable(char filename[], int i_num);
-int SelectTable(char filename[]);
-int IsPermit(int i_num, char operation);
-int AllotDisks(int length);
-void RecoverDisks(int length);
-
 int InitStack(SqStack &S);   //stack init
 int pop(SqStack &S, char e[]);
 int push(SqStack &S, char e[]);
@@ -187,9 +179,10 @@ void DelUserTable(int a, int i) {
 void str2stack(SqStack &s) {
 	fflush(stdin);
 	InitStack(s);
-	printf("Please input the absolute path, end with '#'(ex:root/1/2/#\n)");
+	printf("Please input the absolute path, end with '#'(ex:root/1/2/#)\n");
 	char ch, c1[STACK_SIZE];
 	int num = 0;
+	ch = getchar();
 	while ((ch = getchar()) != '#') {
 		if (ch != '/') {
 			c1[num] = ch;

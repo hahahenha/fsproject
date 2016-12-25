@@ -3,7 +3,7 @@
 * All rights reserved.
 * Project name£ºSimple File System
 * Programmer£ºRandolph Han
-* Finish£º2016.12.10
+* Finish£º2016.12.10¡¢2016.12.25
 *
 */
 #include "head.h"
@@ -55,15 +55,18 @@ void read_file(char tmp[]);		//read a file
 void write_file(char tmp[]);	//write a file
 void close_file(char tmp[]);	//close a file
 void delete_file(char tmp[]);	//delete a file
+void copy_file(char tmp[]);		//copy a file
 void show_info();				//show system information
 void logout(FILE *fp);			//logout
 int change_user(FILE *fp, char tmp[]);	//change user
 void change_mode(char tmp[]);	//chang file mode
+void change_owner(char filename[]);//change file owner
+void change_group(char filename[]);//change file group
 void manage_user();				//user management
 void h_link(char tmp[]);		//hard link
 void s_link(char tmp[]);		//soft link
 void rename(char tmp[]);		//rename a file
-void relogin();					//multiple users
+void change_pwd();				//change password
 
 //path
 int InitStack(SqStack &S);		//Init path
@@ -75,27 +78,28 @@ int find_path(SqStack S);		//get absolute path
 //file tree
 void InitfileTree(FTreepoint &T);    //Init file tree
 
+
 //system start
 void Sys_start(FILE *fp){
 	InitSystem(fp);     //Init system
 
-	printf("**************************************************************\n");
-	printf("*                                                            *\n");
-	printf("*  **           **                                           *\n");
-	printf("*  **           **                                           *\n");
-	printf("*  **           **                                           *\n");
-	printf("*  **           **                                           *\n");
-	printf("*  **           **    ***         *    **    **       **     *\n");
-	printf("*  **           **    *  *        *           **     **      *\n");
-	printf("*  **           **    *   *       *    **      **   **       *\n");
-	printf("*  **           **    *    *      *    **       ** **        *\n");
-	printf("*  **           **    *     *     *    **         **         *\n");
-	printf("*  **           **    *      *    *    **       **  **       *\n");
-	printf("*  **           **    *       *   *    **      **    **      *\n");
-	printf("*  **           **    *        *  *    **     **      **     *\n");
-	printf("*  ***************    *         ***    **    **        **    *\n");
-	printf("*                                                            *\n");
-	printf("**************************************************************\n");
+	printf("\t\t\t\t**************************************************************\n");
+	printf("\t\t\t\t*                                                            *\n");
+	printf("\t\t\t\t*  **           **                                           *\n");
+	printf("\t\t\t\t*  **           **                                           *\n");
+	printf("\t\t\t\t*  **           **                                           *\n");
+	printf("\t\t\t\t*  **           **                                           *\n");
+	printf("\t\t\t\t*  **           **    ***         *    **    **       **     *\n");
+	printf("\t\t\t\t*  **           **    *  *        *           **     **      *\n");
+	printf("\t\t\t\t*  **           **    *   *       *    **      **   **       *\n");
+	printf("\t\t\t\t*  **           **    *    *      *    **       ** **        *\n");
+	printf("\t\t\t\t*  **           **    *     *     *    **         **         *\n");
+	printf("\t\t\t\t*  **           **    *      *    *    **       **  **       *\n");
+	printf("\t\t\t\t*  **           **    *       *   *    **      **    **      *\n");
+	printf("\t\t\t\t*  **           **    *        *  *    **     **      **     *\n");
+	printf("\t\t\t\t*  ***************    *         ***    **    **        **    *\n");
+	printf("\t\t\t\t*                                                            *\n");
+	printf("\t\t\t\t**************************************************************\n");
 }
 
 
@@ -126,7 +130,7 @@ void InitCommand(){
 	strcpy(cmd[6].com, "rmdir");
 	strcpy(cmd[7].com, "create");
 	strcpy(cmd[8].com, "open");
-	strcpy(cmd[9].com, "read");
+	strcpy(cmd[9].com, "cat");
 	strcpy(cmd[10].com, "write");
 	strcpy(cmd[11].com, "close");
 	strcpy(cmd[12].com, "rm");
@@ -138,10 +142,11 @@ void InitCommand(){
 	strcpy(cmd[18].com, "hlink");
 	strcpy(cmd[19].com, "slink");
 	strcpy(cmd[20].com, "mv");
-	strcpy(cmd[21].com, "");
-	strcpy(cmd[22].com, "");
-	strcpy(cmd[23].com, "");
-	strcpy(cmd[24].com, "");
+	strcpy(cmd[21].com, "pwd");
+	strcpy(cmd[22].com, "chown");
+	strcpy(cmd[23].com, "chgrp");
+	strcpy(cmd[24].com, "passwd");
+	strcpy(cmd[25].com, "cp");
 }
 
 //Shell
@@ -190,11 +195,12 @@ void shell(FILE *fp){
 			case 18: scanf("%s", tmp);h_link(tmp);break;		//hard link
 			case 19: scanf("%s", tmp);s_link(tmp);break;		//soft link
 			case 20: scanf("%s", tmp);rename(tmp);break;		//rename
-			//case 21: break;							//for extension
-			//case 22: break;							//for extension
-			//case 23: break;							//for extension
-			//case 24: break;							//for extension
-			default: printf(E21);break; 		//input error			 
+			case 21: find_path(cur_dir);printf("\n");break;		//show path
+			case 22: scanf("%s", tmp);change_owner(tmp);break;	//change file modebreak;							//for extension
+			case 23: scanf("%s", tmp);change_group(tmp);break;	//change file modebreak;
+			case 24: change_pwd();break;						//change password
+			case 25: scanf("%s", tmp);copy_file(tmp);break;		//copy a file
+			default: printf(E21);break; 						//error			 
 			}
 		}
 

@@ -114,7 +114,7 @@
 /*
 *	The maximum number of commands.
 */
-#define COM_NUM 25
+#define COM_NUM 26
 /*
 *	The maximum size of user's name.
 */
