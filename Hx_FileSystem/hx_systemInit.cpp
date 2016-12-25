@@ -196,7 +196,7 @@ void shell(FILE *fp){
 			case 19: scanf("%s", tmp);s_link(tmp);break;		//soft link
 			case 20: scanf("%s", tmp);rename(tmp);break;		//rename
 			case 21: find_path(cur_dir);printf("\n");break;		//show path
-			case 22: scanf("%s", tmp);change_owner(tmp);break;	//change file modebreak;							//for extension
+			case 22: scanf("%s", tmp);change_owner(tmp);break;	//change file modebreak;
 			case 23: scanf("%s", tmp);change_group(tmp);break;	//change file modebreak;
 			case 24: change_pwd();break;						//change password
 			case 25: scanf("%s", tmp);copy_file(tmp);break;		//copy a file

@@ -76,7 +76,7 @@ void CreatBiTree1(FTreepoint &T, int& num)
 	{
 		CreatBiTree1(T->lchild, num);
 	}
-	if (strcmp(file_inode[find_inode_from_name(file_dir[num].file_name)].dir_name, file_inode[find_inode_from_name(T->data.file_name)].dir_name) == 0) //和当前文件的父文件一样
+	if (strcmp(file_inode[find_inode_from_name(file_dir[num].file_name)].dir_name, file_inode[find_inode_from_name(T->data.file_name)].dir_name) == 0)
 	{
 		CreatBiTree1(T->rchild, num);
 	}
@@ -126,22 +126,6 @@ int path_tnode(SqStack S, FTreepoint T, FTreepoint &p)
 	}
 	p = t1;
 	return 1;
-}
-
-
-void add_file_tree(FTreepoint &T, SqStack s, char newname[], int newinode)
-{
-
-}
-
-void del_file_tree(FTreepoint &T, SqStack s, char oldname[], int &oldinode)
-{
-
-}
-
-void rename_file_tree(FTreepoint &T, SqStack s, char oldname[], char newname[])
-{
-
 }
 
 //clear dir

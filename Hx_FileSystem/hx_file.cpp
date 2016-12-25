@@ -88,36 +88,37 @@ void WriteToFile(FILE *fp)
 }
 
 char* r_u(int a) {
-	char word[400];
-	int b = file_inode[a].file_length, i;
+	char word[FILE_BUFFER];
+	int b = file_inode[a].file_length, i, j;
 	int num = 0;
 	if (b < DATA_COUNT - 2) {
 		for (i = 0;i < b;i++) {
-			for (int j = 0;j < 10;j++) {
+			for (j = 0;j < DATA_BLOCK_SIZE;j++) {
 				if (phy[file_inode[a].file_address[i]].p[j] == 0) return word;
 				word[num++] = phy[file_inode[a].file_address[i]].p[j];
 			}
 		}
 	}
 	else {
-		for (int i = 0;i < DATA_COUNT - 3;i++) {
-			for (int j = 0;j < 10;j++) {
+		for (i = 0;i < DATA_COUNT - 3;i++) {
+			for (j = 0;j < DATA_BLOCK_SIZE;j++) {
 				if (phy[file_inode[a].file_address[i]].p[j] == 0) return word;
 				word[num++] = phy[file_inode[a].file_address[i]].p[j];
 			}
 		}
 	}
 	if (b >= DATA_COUNT - 2) {
-		//direct addressing 
-		int f1[2];
-		char b1[5], b2[5];
-		for (i = 0;i < 5;i++) {
-			b1[i] = phy[file_inode[a].file_address[12]].p[i];
-			b2[i] = phy[file_inode[a].file_address[12]].p[i + 5];
+		int f1[FIRST_INDIRECT_NUM];
+		char b1[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM];
+		for (i = 0;i < DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM;i++) {
+			for (j = 0; j < FIRST_INDIRECT_NUM; j++)
+				b1[j][i] = phy[file_inode[a].file_address[DATA_COUNT - 3]].p[i + (DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM)*(j%FIRST_INDIRECT_NUM)];
 		}
-		f1[0] = atoi(b1);f1[1] = atoi(b2);
-		for (i = 0;i < 2;i++) {
-			for (int j = 0;j < 10;j++) {
+		for (i = 0; i < FIRST_INDIRECT_NUM; i++) {
+			f1[i] = atoi(b1[i]);
+		}
+		for (i = 0;i < FIRST_INDIRECT_NUM;i++) {
+			for (int j = 0;j < DATA_BLOCK_SIZE;j++) {
 				if (phy[f1[i]].p[j] == 0) return word;
 				word[num++] = phy[file_inode[a].file_address[i]].p[j];
 			}
@@ -125,29 +126,30 @@ char* r_u(int a) {
 	}
 	if (b >= DATA_COUNT - 1) {
 		//first level indirect addressing 
-		int f1[2], i, j;
-		char b1[5], b_2[5];
-		for (i = 0;i < 5;i++) {
-			b1[i] = phy[file_inode[a].file_address[13]].p[i];
-			b_2[i] = phy[file_inode[a].file_address[13]].p[i + 5];
+		int f1[FIRST_INDIRECT_NUM], i, j;
+		char b1[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM];
+		for (i = 0;i < DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM;i++) {
+			for (j = 0; j < FIRST_INDIRECT_NUM; j++)
+				b1[j][i] = phy[file_inode[a].file_address[DATA_COUNT - 2]].p[i + (DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM)*j];
 		}
-		f1[0] = atoi(b1);f1[1] = atoi(b_2);
+		for (i = 0; i < FIRST_INDIRECT_NUM; i++) {
+			f1[i] = atoi(b1[i]);
+		}
 
 		//second level indirect addressing
-		int f2[4];
-		char b2[4][5];
-		for (j = 0;j < 5;j++) {
-			b2[0][j] = phy[f1[0]].p[j];
-			b2[1][j] = phy[f1[0]].p[j + 5];
-			b2[2][j] = phy[f1[1]].p[j];
-			b2[3][j] = phy[f1[1]].p[j + 5];
+		int f2[SECOND_INDIRECT_NUM];
+		char b2[SECOND_INDIRECT_NUM][DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)];
+		for (j = 0;j < DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM);j++) {
+			for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
+				b2[i][j] = phy[f1[i / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)]].p[j + DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM) * (i % (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM))];
+			}
 		}
-		for (i = 0;i < 4;i++) {
+		for (i = 0;i < SECOND_INDIRECT_NUM;i++) {
 			f2[i] = atoi(b2[i]);
 		}
 
-		for (i = 0;i < 4;i++) {
-			for (j = 0;j < 10;j++) {
+		for (i = 0;i < SECOND_INDIRECT_NUM;i++) {
+			for (j = 0;j < DATA_BLOCK_SIZE;j++) {
 				if (phy[f2[i]].p[j] == 0) return word;
 				word[num++] = phy[file_inode[a].file_address[i]].p[j];
 			}
@@ -155,52 +157,50 @@ char* r_u(int a) {
 	}
 	if (b >= DATA_COUNT) {
 		//first level indirect addressing
-		int f1[2], i, j;
-		char b1[5], b_2[5];
-		for (i = 0;i < 5;i++) {
-			b1[i] = phy[file_inode[a].file_address[14]].p[i];
-			b_2[i] = phy[file_inode[a].file_address[14]].p[i + 5];
+		int f1[FIRST_INDIRECT_NUM], i, j;
+		char b1[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM];
+		for (i = 0;i < DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM;i++) {
+			for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
+				b1[j][i] = phy[file_inode[a].file_address[DATA_COUNT - 1]].p[i + DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM*j];
+			}
 		}
-		f1[0] = atoi(b1);f1[1] = atoi(b_2);
+		for (i = 0; i < FIRST_INDIRECT_NUM; i++) {
+			f1[i] = atoi(b1[i]);
+		}
 
 		//second level indirect addressing 
-		int f2[4];
-		char b2[4][5];
-		for (j = 0;j < 5;j++) {
-			b2[0][j] = phy[f1[0]].p[j];
-			b2[1][j] = phy[f1[0]].p[j + 5];
-			b2[2][j] = phy[f1[1]].p[j];
-			b2[3][j] = phy[f1[1]].p[j + 5];
+		int f2[SECOND_INDIRECT_NUM];
+		char b2[SECOND_INDIRECT_NUM][DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)];
+		for (j = 0;j < DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM);j++) {
+			for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
+				b2[i][j] = phy[f1[i / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)]].p[j + DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM) * (i % (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM))];
+			}
 		}
-		for (i = 0;i < 4;i++) {
+		for (i = 0;i < SECOND_INDIRECT_NUM;i++) {
 			f2[i] = atoi(b2[i]);
 		}
 
 		//third level indirect addressing 
-		int f3[8];
-		char b3[8][5];
-		for (j = 0;j < 5;j++) {
-			b3[0][j] = phy[f2[0]].p[j];
-			b3[1][j] = phy[f2[0]].p[j + 5];
-			b3[2][j] = phy[f2[1]].p[j];
-			b3[3][j] = phy[f2[1]].p[j + 5];
-			b3[4][j] = phy[f2[2]].p[j];
-			b3[5][j] = phy[f2[2]].p[j + 5];
-			b3[6][j] = phy[f2[3]].p[j];
-			b3[7][j] = phy[f2[3]].p[j + 5];
+		int f3[THIRD_INDIRECT_NUM];
+		char b3[THIRD_INDIRECT_NUM][DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM)];
+		for (j = 0;j < DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM);j++) {
+			for (i = 0; i < THIRD_INDIRECT_NUM; i++) {
+				b3[i][j] = phy[f2[i / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM)]].p[j + DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM) * (i % (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM))];
+			}
 		}
-		for (i = 0;i < 8;i++) {
+		for (i = 0;i < THIRD_INDIRECT_NUM;i++) {
 			f3[i] = atoi(b3[i]);
 		}
 
 
-		for (i = 0;i < 8;i++) {
-			for (j = 0;j < 10;j++) {
+		for (i = 0;i < THIRD_INDIRECT_NUM;i++) {
+			for (j = 0;j < DATA_BLOCK_SIZE;j++) {
 				if (phy[f3[i]].p[j] == 0) return word;
 				word[num++] = phy[file_inode[a].file_address[i]].p[j];
 			}
 		}
 	}
+	return word;
 }
 
 //read users information
@@ -281,26 +281,26 @@ void w_u(int a) {  //a:inode number
 	buffer[num] = 0;
 
 	file_inode[a].file_length = 0;
-	if (num>FILE_BUFFER) {
+	if (num > FILE_BUFFER) {
 		printf("The input content out of the size!\n");
 		return;
 	}
-	if (num <= 120 && num>0) {
-		if (num % 10 == 0) {
-			for (int i = 0;i<num / 10 + 1;i++) {
+	if (num <= (DATA_COUNT - 3)*DATA_BLOCK_SIZE && num > 0) {
+		if (num % DATA_BLOCK_SIZE == 0) {
+			for (int i = 0;i < num / DATA_BLOCK_SIZE + 1;i++) {
 				file_inode[a].file_address[i] = find_super();
-				for (int j = 0;j<10;j++) {
-					phy[find_super()].p[j] = buffer[i * 10 + j];
+				for (int j = 0;j<DATA_BLOCK_SIZE;j++) {
+					phy[find_super()].p[j] = buffer[i * DATA_BLOCK_SIZE + j];
 				}
 				hx_superblock.phydata[find_super()] = 1;
 				file_inode[a].file_length++;
 			}
 		}
 		else {
-			for (int i = 0;i<num / 10 + 1;i++) {
+			for (int i = 0;i<num / DATA_BLOCK_SIZE + 1;i++) {
 				file_inode[a].file_address[i] = find_super();
-				for (int j = 0;j<10;j++) {
-					phy[find_super()].p[j] = buffer[i * 10 + j];
+				for (int j = 0;j<DATA_BLOCK_SIZE;j++) {
+					phy[find_super()].p[j] = buffer[i * DATA_BLOCK_SIZE + j];
 				}
 				hx_superblock.phydata[find_super()] = 1;
 				file_inode[a].file_length++;
@@ -308,205 +308,148 @@ void w_u(int a) {  //a:inode number
 		}
 	}
 	else {
-		for (int i = 0;i<12;i++) {
+		for (int i = 0;i<DATA_COUNT - 3;i++) {
 			file_inode[a].file_address[i] = find_super();
-			for (int j = 0;j<512;j++) {
-				phy[find_super()].p[j] = buffer[i * 10 + j];
+			for (int j = 0;j<DATA_BLOCK_SIZE;j++) {
+				phy[find_super()].p[j] = buffer[i * DATA_BLOCK_SIZE + j];
 			}
 			hx_superblock.phydata[find_super()] = 1;
 			file_inode[a].file_length++;
 		}
 	}
-	if (num>120) {   //简化处理，直接开辟两个存储空间
-		file_inode[a].file_address[12] = find_super();
+	if (num>(DATA_COUNT - 3)*DATA_BLOCK_SIZE) {
+		file_inode[a].file_address[DATA_COUNT - 3] = find_super();
 		file_inode[a].file_length++;
-		hx_superblock.phydata[find_super()] = 1;
-		int first = find_super();
-		hx_superblock.phydata[find_super()] = 1;
-		int second = find_super();
-		hx_superblock.phydata[find_super()] = 1;
-		char buf[5] = { 0 }, buf1[5] = { 0 };
-		itoa(first, buf, 512);
-		itoa(second, buf1, 512);
-		int i;
-		for (i = 0;i<512;i++) {
-			phy[file_inode[a].file_address[12]].p[i] = buf[i];
-			phy[file_inode[a].file_address[12]].p[i + 5] = buf1[i];
+		int Inodenum[FIRST_INDIRECT_NUM];
+		for (int i = 0; i < FIRST_INDIRECT_NUM; i++) {
+			hx_superblock.phydata[find_super()] = 1;
+			Inodenum[i] = find_super();
 		}
-		//开始存储内容
-		for (i = 120;i<130;i++) {
-			if (i>num) {
-				break;
-			}
-			phy[first].p[i - 120] = buffer[i];
+		hx_superblock.phydata[find_super()] = 1;
+		char buf[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM] = { 0 };
+		for (int i = 0; i < FIRST_INDIRECT_NUM; i++) {
+			itoa(Inodenum[i], buf[i], DATA_BLOCK_SIZE);
 		}
-		for (i = 130;i<140;i++) {
-			if (i>num) {
-				break;
+		int i, j;
+		for (i = 0;i < DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM; i++) {
+			for (int j = 0; j < FIRST_INDIRECT_NUM; j++) {
+				phy[file_inode[a].file_address[DATA_COUNT - 3]].p[i + (DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM * j)] = buf[j][i];
 			}
-			phy[second].p[i - 130] = buffer[i];
+		}
+		//save
+		for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
+			for (i = (DATA_COUNT - 3 + j)*DATA_BLOCK_SIZE; i < (DATA_COUNT - 3 + j + 1) * DATA_BLOCK_SIZE; i++) {
+				if (i > num) break;
+				phy[Inodenum[j]].p[i - (DATA_COUNT - 3 + j)*DATA_BLOCK_SIZE] = buffer[i];
+			}
 		}
 	}
-	if (num>140) {
-		file_inode[a].file_address[13] = find_super();
+	if (num>(DATA_COUNT + FIRST_INDIRECT_NUM - 3)*DATA_BLOCK_SIZE) {
+		file_inode[a].file_address[DATA_COUNT - 2] = find_super();
 		file_inode[a].file_length++;
+		int Inodenum[FIRST_INDIRECT_NUM];
+		for (int i = 0; i < FIRST_INDIRECT_NUM; i++) {
+			hx_superblock.phydata[find_super()] = 1;
+			Inodenum[i] = find_super();
+		}
 		hx_superblock.phydata[find_super()] = 1;
-		int first = find_super();
-		hx_superblock.phydata[find_super()] = 1;
-		int second = find_super();
-		hx_superblock.phydata[find_super()] = 1;
-		char buf[5] = { 0 }, buf1[5] = { 0 };
-		itoa(first, buf, 512);
-		itoa(second, buf1, 512);
-		//一次间接寻址
-		for (int i = 0;i<512;i++) {
-			phy[file_inode[a].file_address[13]].p[i] = buf[i];
-			phy[file_inode[a].file_address[13]].p[i + 5] = buf1[i];
+		char buf[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM] = { 0 };
+		for (int i = 0; i < FIRST_INDIRECT_NUM; i++) {
+			itoa(Inodenum[i], buf[i], DATA_BLOCK_SIZE);
+		}
+		//first
+		int i, j;
+		for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
+			for (i = (DATA_COUNT - 3 + j)*DATA_BLOCK_SIZE; i < (DATA_COUNT + j - 2) * DATA_BLOCK_SIZE; i++) {
+				phy[Inodenum[j]].p[i - (DATA_COUNT - 3 + j)*DATA_BLOCK_SIZE] = buffer[i];
+			}
 		}
 
-		int f1, f2, f3, f4, i;
-		f1 = find_super();hx_superblock.phydata[f1] = 1;
-		f2 = find_super();hx_superblock.phydata[f2] = 1;
-		f3 = find_super();hx_superblock.phydata[f3] = 1;
-		f4 = find_super();hx_superblock.phydata[f4] = 1;
-		char b1[5] = { 0 }, b2[5] = { 0 }, b3[5] = { 0 }, b4[5] = { 0 };
-		itoa(f1, b1, 512);itoa(f2, b2, 512);itoa(f3, b3, 512);itoa(f4, b4, 512);
-		//二次间接寻址
-		for (i = 0;i<5;i++)
-		{
-			phy[first].p[i] = b1[i];
-			phy[first].p[i + 5] = b2[i];
-			phy[second].p[i] = b3[i];
-			phy[second].p[i + 5] = b4[i];
+		int f[SECOND_INDIRECT_NUM];
+		for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
+			f[i] = find_super();
+			hx_superblock.phydata[f[i]] = 1;
 		}
-		//开始存储内容
-		for (i = 140;i<150;i++) {
-			if (i>num) {
-				break;
-			}
-			phy[f1].p[i - 140] = buffer[i];
+		char b[SECOND_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM] = { 0 };
+		for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
+			itoa(f[i], b[i], DATA_BLOCK_SIZE);
 		}
-		for (i = 150;i<160;i++) {
-			if (i>num) {
-				break;
+		//second
+		for (i = 0;i<DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM);i++) {
+			for (j = 0; j < SECOND_INDIRECT_NUM; j++) {
+				phy[Inodenum[j / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)]].p[i + (j % (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM))*DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)] = b[j][i];
 			}
-			phy[f2].p[i - 150] = buffer[i];
 		}
-		for (i = 160;i<170;i++) {
-			if (i>num) {
-				break;
+		//save
+		for (j = 0; j < SECOND_INDIRECT_NUM; j++) {
+			for (i = (DATA_COUNT + j - 1)*DATA_BLOCK_SIZE; i < (DATA_COUNT + j)*DATA_BLOCK_SIZE;i++) {
+				if (i > num) {
+					break;
+				}
+				phy[f[j]].p[i - (DATA_COUNT + j - 1)*DATA_BLOCK_SIZE] = buffer[i];
 			}
-			phy[f3].p[i - 160] = buffer[i];
-		}
-		for (i = 170;i<180;i++) {
-			if (i>num) {
-				break;
-			}
-			phy[f4].p[i - 170] = buffer[i];
 		}
 	}
-	if (num>180) {
-		file_inode[a].file_address[14] = find_super();
+	if (num>(DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM - 3)*DATA_BLOCK_SIZE) {
+		file_inode[a].file_address[DATA_COUNT - 1] = find_super();
 		file_inode[a].file_length++;
+
+		int Inodenum[FIRST_INDIRECT_NUM];
+		for (int i = 0; i < FIRST_INDIRECT_NUM; i++) {
+			hx_superblock.phydata[find_super()] = 1;
+			Inodenum[i] = find_super();
+		}
 		hx_superblock.phydata[find_super()] = 1;
-		int first = find_super();
-		hx_superblock.phydata[find_super()] = 1;
-		int second = find_super();
-		hx_superblock.phydata[find_super()] = 1;
-		char buf[5] = { 0 }, buf1[5] = { 0 };
-		itoa(first, buf, 512);
-		itoa(second, buf1, 512);
-		for (int i = 0;i<5;i++) {
-			phy[file_inode[a].file_address[14]].p[i] = buf[i];
-			phy[file_inode[a].file_address[14]].p[i + 5] = buf1[i];
+		char buf[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM] = { 0 };
+		for (int i = 0; i < FIRST_INDIRECT_NUM; i++) {
+			itoa(Inodenum[i], buf[i], DATA_BLOCK_SIZE);
+		}
+		//first
+		int i, j;
+		for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
+			for (i = (DATA_COUNT - 3 + j)*DATA_BLOCK_SIZE; i < (DATA_COUNT + j - 2) * DATA_BLOCK_SIZE; i++) {
+				phy[Inodenum[j]].p[i - (DATA_COUNT - 3 + j)*DATA_BLOCK_SIZE] = buffer[i];
+			}
 		}
 
-		int f1, f2, f3, f4, i;
-		f1 = find_super();hx_superblock.phydata[f1] = 1;
-		f2 = find_super();hx_superblock.phydata[f2] = 1;
-		f3 = find_super();hx_superblock.phydata[f3] = 1;
-		f4 = find_super();hx_superblock.phydata[f4] = 1;
-		char b1[5] = { 0 }, b2[5] = { 0 }, b3[5] = { 0 }, b4[5] = { 0 };
-		itoa(f1, b1, 512);itoa(f2, b2, 512);itoa(f3, b3, 512);itoa(f4, b4, 512);
-
-		for (i = 0;i<5;i++)
-		{
-			phy[first].p[i] = b1[i];
-			phy[first].p[i + 5] = b2[i];
-			phy[second].p[i] = b3[i];
-			phy[second].p[i + 5] = b4[i];
+		int f[SECOND_INDIRECT_NUM];
+		for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
+			f[i] = find_super();
+			hx_superblock.phydata[f[i]] = 1;
 		}
-
-		int ff1, ff2, ff3, ff4, ff5, ff6, ff7, ff8;
-		ff1 = find_super();hx_superblock.phydata[ff1] = 1;
-		ff2 = find_super();hx_superblock.phydata[ff2] = 1;
-		ff3 = find_super();hx_superblock.phydata[ff3] = 1;
-		ff4 = find_super();hx_superblock.phydata[ff4] = 1;
-		ff5 = find_super();hx_superblock.phydata[ff5] = 1;
-		ff6 = find_super();hx_superblock.phydata[ff6] = 1;
-		ff7 = find_super();hx_superblock.phydata[ff7] = 1;
-		ff8 = find_super();hx_superblock.phydata[ff8] = 1;
-		char bb1[5] = { 0 }, bb2[5] = { 0 }, bb3[5] = { 0 }, bb4[5] = { 0 }, bb5[5] = { 0 }, bb6[5] = { 0 }, bb7[5] = { 0 }, bb8[5] = { 0 };
-		itoa(ff1, bb1, 512);itoa(ff2, bb2, 512);itoa(ff3, bb3, 512);itoa(ff4, bb4, 512);
-		itoa(ff5, bb5, 512);itoa(ff6, bb6, 512);itoa(ff7, bb7, 512);itoa(ff8, bb8, 512);
-		for (i = 0;i<5;i++) {
-			phy[f1].p[i] = bb1[i];
-			phy[f1].p[i + 5] = bb2[i];
-			phy[f2].p[i] = bb3[i];
-			phy[f2].p[i + 5] = bb4[i];
-			phy[f3].p[i] = bb5[i];
-			phy[f3].p[i + 5] = bb6[i];
-			phy[f4].p[i] = bb7[i];
-			phy[f4].p[i + 5] = bb8[i];
+		char b[SECOND_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM] = { 0 };
+		for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
+			itoa(f[i], b[i], DATA_BLOCK_SIZE);
 		}
-
-		for (i = 180;i<190;i++) {
-			if (i>num) {
-				break;
+		//second
+		for (i = 0;i<DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM);i++) {
+			for (j = 0; j < SECOND_INDIRECT_NUM; j++) {
+				phy[Inodenum[j / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)]].p[i + (j % (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM))*DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)] = b[j][i];
 			}
-			phy[ff1].p[i - 180] = buffer[i];
 		}
-		for (i = 190;i<200;i++) {
-			if (i>num) {
-				break;
-			}
-			phy[ff2].p[i - 190] = buffer[i];
+		//third
+		int ff[THIRD_INDIRECT_NUM];
+		for (i = 0; i < THIRD_INDIRECT_NUM; i++) {
+			ff[0] = find_super();
+			hx_superblock.phydata[ff[i]] = 1;
 		}
-		for (i = 200;i<210;i++) {
-			if (i>num) {
-				break;
-			}
-			phy[ff3].p[i - 200] = buffer[i];
+		char bb[THIRD_INDIRECT_NUM][DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM)] = { 0 };
+		for (i = 0; i < THIRD_INDIRECT_NUM; i++) {
+			itoa(ff[i], bb[i], DATA_BLOCK_SIZE);
 		}
-		for (i = 210;i<220;i++) {
-			if (i>num) {
-				break;
+		for (i = 0;i < DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM;i++) {
+			for (j = 0; j < THIRD_INDIRECT_NUM; j++) {
+				phy[f[j / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM)]].p[i + DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM)*(j % (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM))] = bb[j][i];
 			}
-			phy[ff4].p[i - 210] = buffer[i];
 		}
-		for (i = 220;i<230;i++) {
-			if (i>num) {
-				break;
+		//save
+		for (j = 0; j < THIRD_INDIRECT_NUM; j++) {
+			for (i = (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + j - 3)*DATA_BLOCK_SIZE;i < (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + j - 2)*DATA_BLOCK_SIZE;i++) {
+				if (i > num) {
+					break;
+				}
+				phy[ff[j]].p[i - (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + j - 3)*DATA_BLOCK_SIZE] = buffer[i];
 			}
-			phy[ff5].p[i - 220] = buffer[i];
-		}
-		for (i = 230;i<240;i++) {
-			if (i>num) {
-				break;
-			}
-			phy[ff6].p[i - 230] = buffer[i];
-		}
-		for (i = 240;i<250;i++) {
-			if (i>num) {
-				break;
-			}
-			phy[ff7].p[i - 240] = buffer[i];
-		}
-		for (i = 250;i<260;i++) {
-			if (i>num) {
-				break;
-			}
-			phy[ff8].p[i - 250] = buffer[i];
 		}
 	}
 }
@@ -515,14 +458,14 @@ void w_u(int a) {  //a:inode number
 void SaveUsers()
 {
 	char filename[] = "pw";
-	int a;     //a代表代开文件的inode号
+	int a;
 	FTreepoint p = NULL, p2 = NULL;
 	path_tnode(cur_dir, L_Ftree, p);
-	if (p->lchild == NULL)      //为空
+	if (p->lchild == NULL)
 	{
 		printf(E14);
 	}
-	else   //非空
+	else
 	{
 		p = p->lchild;
 		while (p != NULL)

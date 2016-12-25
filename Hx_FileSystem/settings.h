@@ -28,6 +28,18 @@
 */
 #define DATA_BLOCK_SIZE 10
 /*
+*	First indirect addressing block number
+*/
+#define FIRST_INDIRECT_NUM 2
+/*
+*	Second indirect addressing block number
+*/
+#define SECOND_INDIRECT_NUM FIRST_INDIRECT_NUM*2
+/*
+*	Third indirect addressing block number
+*/
+#define THIRD_INDIRECT_NUM SECOND_INDIRECT_NUM*2
+/*
 *	Size of BLOCK_GTOUP
 */
 #define BLOCK_GROUP_SIZE (PHY_DATA_SIZE/DATA_BLOCK_SIZE)
@@ -85,28 +97,6 @@
 *	Tenth bit:	Executable permissions for other users.
 */
 #define PERMISSIONS 9
-#define INODE_TYPE 1 << 0
-#define USER_R 1 << 1
-#define USER_W 1 << 2
-#define USER_X 1 << 3
-#define GROUP_R 1 << 4
-#define GROUP_W 1 << 5
-#define GROUP_X 1 << 6
-#define OTHER_R 1 << 7
-#define OTHER_W 1 << 8
-#define OTHER_X 1 << 9
-/*
-*	ALL permissions to a file.
-*/
-#define FILE_MAX (USER_R | USER_W | GROUP_R | GROUP_W | OTHER_R | OTHER_W)
-/*
-*	ALL permissions to a directory.
-*/
-#define DIR_MAX (USER_R | USER_W | GROUP_R | GROUP_W | OTHER_R | OTHER_W)
-/*
-*	The maximum size of a file.
-*/
-#define FILE_SIZE_MAX FILE_DIRECT_SIZE_MAX + FILE_SINGAL_SIZE_MAX + FILE_DOUBLE_SIZE_MAX
 /*
 *	The maximum length of a command.
 */
@@ -152,9 +142,9 @@
 */
 #define GROUPS_FILE_NAME "group"
 /*
-*	File content buffer
+*	File content buffer(maximum size of file)
 */
-#define FILE_BUFFER 260
+#define FILE_BUFFER ((DATA_COUNT-3)+FIRST_INDIRECT_NUM+SECOND_INDIRECT_NUM+THIRD_INDIRECT_NUM)*DATA_BLOCK_SIZE
 /*
 *	File address buffer
 */
