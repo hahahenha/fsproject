@@ -160,6 +160,7 @@ void shell(FILE *fp){
 			find_path(cur_dir);
 			printf(">");
 			scanf("%s", com);       //input a command 
+			if (strcmp(com, "cd.") == 0) continue;
 			for (i = 0;i<COM_NUM;i++){
 				if (strcmp(com, cmd[i].com) == 0){
 					p = i;

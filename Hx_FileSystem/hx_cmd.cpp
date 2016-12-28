@@ -185,7 +185,7 @@ int login(){
 void show_curdir(){
 	int i;
 	//formta
-	printf("\tname\ttype\tlength\tpermission\tuser\tgroup\ttime\n");
+	printf("\tname\ttype\tlength\tpermission\tuser\tgroup\ttime\n\t.\n\t..\n");
 	FTreepoint p = NULL;
 	path_tnode(cur_dir, L_Ftree, p);
 	
@@ -569,7 +569,7 @@ void delete_file(char filename[]){
 		p2 = p->lchild;
 		if ((strcmp(p2->data.file_name, filename) == 0) && (file_inode[p2->data.dir_inode].file_style == 1)) {  //delete the first file
 			//active?
-			for (int j = 0;j<200;j++){
+			for (int j = 0;j<SYSTEM_ALLOW_OPEN_COUNT;j++){
 				if (sys_open_table[j].f_inode == p2->data.dir_inode){
 					printf(E13);return;
 				}
@@ -1183,7 +1183,6 @@ void logout(FILE *fp)
 {
 	//write system information to file
 	WriteToFile(fp);
-	system("cls");		//********************不符合实验要求函数！！！*********************************
 	login();
 }
 //change user
@@ -1210,7 +1209,6 @@ int change_user(FILE *fp, char username[])
 	}
 	//write to file
 	WriteToFile(fp);
-	system("cls");			//********************不符合实验要求函数！！！*********************************
 
 	for (count = 0; count < TRY_NUM; count++)
 	{
