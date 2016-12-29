@@ -30,15 +30,15 @@
 /*
 *	First indirect addressing block number
 */
-#define FIRST_INDIRECT_NUM 2
+#define FIRST_INDIRECT_NUM (DATA_BLOCK_SIZE/sizeof(int32_t))
 /*
 *	Second indirect addressing block number
 */
-#define SECOND_INDIRECT_NUM FIRST_INDIRECT_NUM*2
+#define SECOND_INDIRECT_NUM (FIRST_INDIRECT_NUM*(DATA_BLOCK_SIZE/sizeof(int32_t)))
 /*
 *	Third indirect addressing block number
 */
-#define THIRD_INDIRECT_NUM SECOND_INDIRECT_NUM*2
+#define THIRD_INDIRECT_NUM (SECOND_INDIRECT_NUM*(DATA_BLOCK_SIZE/sizeof(int32_t)))
 /*
 *	Size of BLOCK_GTOUP
 */
@@ -46,7 +46,7 @@
 /*
 *	Number of adressing: 15.
 */
-#define DATA_COUNT 15
+#define DATA_COUNT 5
 /*
 *	The maximum length of a file name.
 */
@@ -74,7 +74,7 @@
 /*
 *	The maximum number of the file system users.
 */
-#define USER_COUNT 5
+#define USER_COUNT 2
 /*
 *	The maximum number of files allowing to access.
 */
@@ -93,7 +93,7 @@
 *	Sixth bit:	Read permissions for the users group.
 *	Seventh bit:Executable permissions for the users group.
 *	Eight bit:	Write permission for other users.
-*	Ninth bit:	Read permissions for other users.
+*	Nint32_th bit:	Read permissions for other users.
 *	Tenth bit:	Executable permissions for other users.
 */
 #define PERMISSIONS 9
@@ -144,7 +144,7 @@
 /*
 *	File content buffer(maximum size of file)
 */
-#define FILE_BUFFER ((DATA_COUNT-3)+FIRST_INDIRECT_NUM+SECOND_INDIRECT_NUM+THIRD_INDIRECT_NUM)*DATA_BLOCK_SIZE
+#define FILE_BUFFER (((DATA_COUNT-3)+FIRST_INDIRECT_NUM+SECOND_INDIRECT_NUM+THIRD_INDIRECT_NUM)*DATA_BLOCK_SIZE)
 /*
 *	File address buffer
 */

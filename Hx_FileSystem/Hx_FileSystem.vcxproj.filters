@@ -18,10 +18,10 @@
     <ClInclude Include="head.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="settings.h">
+    <ClInclude Include="expections.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="expections.h">
+    <ClInclude Include="settings.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

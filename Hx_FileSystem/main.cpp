@@ -19,7 +19,7 @@ usernote L_user[USER_COUNT];            //users array
 usernote cur_user;				//current user
 SqStack cur_dir;     			//current directory
 
-int f_inode;					//current active inode number
+int32_t f_inode;					//current active inode number
 
 super_block hx_superblock;		//super block
 inode  file_inode[INODES_COUNT];			//inode
@@ -33,7 +33,7 @@ ActiveNode active_inode_table;			//active inode table
 
 
 char buffer[FILE_BUFFER];			    //file content buffer
-int	address_buffer[FILE_ADDRESS_BUFFER];//file address buffer
+int32_t	address_buffer[FILE_ADDRESS_BUFFER];//file address buffer
 
 FTreepoint L_Ftree;				//file tree
 

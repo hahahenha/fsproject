@@ -13,7 +13,7 @@ extern usernote cur_user;			//current user
 extern SqStack cur_dir;     		//current directory
 extern Sys_cmd cmd[COM_NUM];				//23 commands
 extern usernote L_user[USER_COUNT];			//users array
-extern int f_inode;					//current active inode number
+extern int32_t f_inode;					//current active inode number
 
 extern super_block hx_superblock;   //super block
 extern inode file_inode[INODES_COUNT];		//inode
@@ -42,7 +42,7 @@ void InitCommand();				//Init command
 void shell(FILE *fp);			//Init shell
 
 //cmd
-int login();					//login function
+int32_t login();					//login function
 void help();					//help function
 void show_curdir();				//show current directory
 void go_dir(char tmp[]);		//jump to a directory
@@ -58,7 +58,7 @@ void delete_file(char tmp[]);	//delete a file
 void copy_file(char tmp[]);		//copy a file
 void show_info();				//show system information
 void logout(FILE *fp);			//logout
-int change_user(FILE *fp, char tmp[]);	//change user
+int32_t change_user(FILE *fp, char tmp[]);	//change user
 void change_mode(char tmp[]);	//chang file mode
 void change_owner(char filename[]);//change file owner
 void change_group(char filename[]);//change file group
@@ -69,11 +69,11 @@ void rename(char tmp[]);		//rename a file
 void change_pwd();				//change password
 
 //path
-int InitStack(SqStack &S);		//Init path
-int pop(SqStack &S, char e[]);	//pop path
-int push(SqStack &S, char e[]);	//push path
-int Gettop(SqStack S, char e[]);//get the top path
-int find_path(SqStack S);		//get absolute path
+int32_t InitStack(SqStack &S);		//Init path
+int32_t pop(SqStack &S, char e[]);	//pop path
+int32_t push(SqStack &S, char e[]);	//push path
+int32_t Gettop(SqStack S, char e[]);//get the top path
+int32_t find_path(SqStack S);		//get absolute path
 
 //file tree
 void InitfileTree(FTreepoint &T);    //Init file tree
@@ -114,6 +114,8 @@ void InitSystem(FILE *fp){
 	InitCommand();
 	InitStack(cur_dir);      //Init stack path
 	push(cur_dir, "root");
+	file_dir;
+	file_inode;
 	InitfileTree(L_Ftree);
 	InitUsers();			//Init users
 	WriteToFile(fp);
@@ -151,7 +153,7 @@ void InitCommand(){
 
 //Shell
 void shell(FILE *fp){
-	int i, p;				//p: command number
+	int32_t i, p;				//p: command number
 	char com[CMD_LENGTH], tmp[2*CMD_LENGTH];  //com: current command, tmp: parameter
 	while (1){
 		if (!login()) return;
@@ -210,7 +212,7 @@ void shell(FILE *fp){
 
 //Init disk
 void InitDisks(){
-	int i, j, num = 1;
+	int32_t i, j, num = 1;
 	hx_superblock.number_data = PHY_DATA_SIZE;
 	hx_superblock.number_dir = DIR_COUNT;
 	hx_superblock.number_inode = INODES_COUNT;
@@ -284,7 +286,7 @@ void InitUsers()
 		L_user[0].group = 1;
 		L_user[0].level = 1;
 		//除了初始化时生成的超级管理员之外,其余用户空间都值为负值,等待用户创建
-		for (int i = 1;i<USER_COUNT;i++)
+		for (int32_t i = 1;i<USER_COUNT;i++)
 		{
 			L_user[i].userid = -1;
 			strcpy(L_user[i].username, "");//用户名以及密码都设置为空
@@ -307,12 +309,12 @@ void InitUsers()
 
 //Init others
 void InitTable(){
-	int i, j;
+	int32_t i, j;
 	
 	//Init user open table
 	for (i = 0;i<USER_COUNT;i++)
 		for (j = 0;j<USER_ALLOW_OPEN_COUNT;j++)
-			user_open_table[i].point[j] = -1;
+			user_open_table[i].point32_t[j] = -1;
 	//Init system open table
 	for (i = 0; i<SYSTEM_ALLOW_OPEN_COUNT; i++){
 		sys_open_table[i].f_inode = -1;

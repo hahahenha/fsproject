@@ -8,13 +8,13 @@
 */
 #include "head.h"
 
-int InitStack(SqStack &S);		//Init path
-int pop(SqStack &S, char e[]);	//pop path
-int push(SqStack &S, char e[]);	//push path
-int Gettop(SqStack S, char e[]);//get the top path
-int find_path(SqStack S);		//get absolute path
+int32_t InitStack(SqStack &S);		//Init path
+int32_t pop(SqStack &S, char e[]);	//pop path
+int32_t push(SqStack &S, char e[]);	//push path
+int32_t Gettop(SqStack S, char e[]);//get the top path
+int32_t find_path(SqStack S);		//get absolute path
 
-int InitStack(SqStack &S){
+int32_t InitStack(SqStack &S){
 	S.base = (path*)malloc((STACK_SIZE) * sizeof(path));
 	if (!S.base)exit(-2);
 	S.top = S.base;
@@ -22,27 +22,27 @@ int InitStack(SqStack &S){
 	return 1;
 }
 
-int pop(SqStack &S, char e[]){
+int32_t pop(SqStack &S, char e[]){
 	if (S.base == S.top) return 0;
 	S.top--;
 	strcpy(e, ((*S.top).data));
 	return 1;
 }
 
-int push(SqStack &S, char e[]){
+int32_t push(SqStack &S, char e[]){
 	strcpy((*S.top).data, e);
 	S.top++;
 	return 1;
 }
 
-int Gettop(SqStack S, char e[]){
+int32_t Gettop(SqStack S, char e[]){
 	if (S.base == S.top) return 0;
 	strcpy(e, (*(S.top - 1)).data);
 	return 1;
 }
 
 
-int find_path(SqStack S){
+int32_t find_path(SqStack S){
 	path *a;
 	if (S.base == S.top) return 0;
 	a = S.base;

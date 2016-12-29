@@ -11,18 +11,18 @@
 extern FTreepoint L_Ftree;
 extern dir file_dir[DIR_COUNT];				//dir block
 extern inode file_inode[INODES_COUNT];		//inode
-void CreatBiTree1(FTreepoint &T, int& num); //create tree
+void CreatBiTree1(FTreepoint &T, int32_t& num); //create tree
 void InitfileTree(FTreepoint &T);			//create tree(from dir)
-int find_inode_from_name(char name[USER_NAME_LENGTH]);		//find inode by file name
-void Tree_to_dir(int &num, dir file_dir[], FTreepoint &T);  //save tree
-int find_num_of_file();			//culate the sum of files
+int32_t find_inode_from_name(char name[USER_NAME_LENGTH]);		//find inode by file name
+void Tree_to_dir(int32_t &num, dir file_dir[], FTreepoint &T);  //save tree
+int32_t find_num_of_file();			//culate the sum of files
 
 void clear_dir(dir file_dir[]); //clear file_dir
 
 //find inode by file name
-int find_inode_from_name(char name[USER_NAME_LENGTH])
+int32_t find_inode_from_name(char name[USER_NAME_LENGTH])
 {
-	for (int i = 0;i < DIR_COUNT;i++)
+	for (int32_t i = 0;i < DIR_COUNT;i++)
 	{
 		if (strcmp(name, file_dir[i].file_name) == 0)
 		{
@@ -34,10 +34,10 @@ int find_inode_from_name(char name[USER_NAME_LENGTH])
 }
 
 //culate the sum of files
-int find_num_of_file()
+int32_t find_num_of_file()
 {
-	int num = 0;
-	for (int i = 0;i<DIR_COUNT;i++)
+	int32_t num = 0;
+	for (int32_t i = 0;i<DIR_COUNT;i++)
 	{
 		if (file_dir[i].dir_inode >= 0)
 		{
@@ -50,7 +50,7 @@ int find_num_of_file()
 
 void InitfileTree(FTreepoint &T)
 {
-	int a = 0;
+	int32_t a = 0;
 	T = (FTree *)malloc(sizeof(FTree));
 	strcpy(T->data.file_name, "root");
 	T->lchild = T->rchild = NULL;
@@ -60,7 +60,7 @@ void InitfileTree(FTreepoint &T)
 	}
 }
 
-void CreatBiTree1(FTreepoint &T, int& num)
+void CreatBiTree1(FTreepoint &T, int32_t& num)
 {
 	if (num >= find_num_of_file())
 	{
@@ -72,18 +72,18 @@ void CreatBiTree1(FTreepoint &T, int& num)
 	T->data.dir_inode = file_dir[num].dir_inode;
 	strcpy(T->data.file_name, file_dir[num].file_name);
 	num++;
-	if (strcmp(file_inode[find_inode_from_name(file_dir[num].file_name)].dir_name, T->data.file_name) == 0)
+	if (strcmp(file_inode[file_dir[num].dir_inode].dir_name, T->data.file_name) == 0)
 	{
 		CreatBiTree1(T->lchild, num);
 	}
-	if (strcmp(file_inode[find_inode_from_name(file_dir[num].file_name)].dir_name, file_inode[find_inode_from_name(T->data.file_name)].dir_name) == 0)
+	if (strcmp(file_inode[file_dir[num].dir_inode].dir_name, file_inode[T->data.dir_inode].dir_name) == 0)
 	{
 		CreatBiTree1(T->rchild, num);
 	}
 }
 
 //save tree to disk
-void Tree_to_dir(int &num, dir file_dir[], FTreepoint &T)
+void Tree_to_dir(int32_t &num, dir file_dir[], FTreepoint &T)
 {
 	if (T)
 	{
@@ -96,7 +96,7 @@ void Tree_to_dir(int &num, dir file_dir[], FTreepoint &T)
 }
 
 //find root
-int path_tnode(SqStack S, FTreepoint T, FTreepoint &p)
+int32_t path_tnode(SqStack S, FTreepoint T, FTreepoint &p)
 {
 	FTreepoint t1;
 	t1 = T;
@@ -131,7 +131,7 @@ int path_tnode(SqStack S, FTreepoint T, FTreepoint &p)
 //clear dir
 void clear_dir(dir file_dir[])
 {
-	for (int i = 0;i<DIR_COUNT;i++)
+	for (int32_t i = 0;i<DIR_COUNT;i++)
 	{
 		strcpy(file_dir[i].file_name, "");
 		file_dir[i].dir_inode = -1;
@@ -139,7 +139,7 @@ void clear_dir(dir file_dir[])
 }
 
 //culate file number
-void cul_num(FTreepoint &T, int &n_file, int &n_dir)
+void cul_num(FTreepoint &T, int32_t &n_file, int32_t &n_dir)
 {
 	if (T)
 	{

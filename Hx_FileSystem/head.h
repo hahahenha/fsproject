@@ -27,32 +27,32 @@ typedef struct{
 	char username[USER_NAME_LENGTH];	//Username
 	char password[USER_PASSWORD_LENGTH];	//password
 	char level;			//level£¬root: 1 & common user: 0
-	int userid;			//user's id(start from 0)
-	int group;			//group number
-} usernote,* userpoint;
+	int32_t userid;			//user's id(start from 0)
+	int32_t group;			//group number
+} usernote,* userpoint32_t;
 
 /**
 *	Commands Information
 */
 typedef struct{ 
 	char com[CMD_LENGTH];
-} Sys_cmd,* Sys_cmd_point; 
+} Sys_cmd,* Sys_cmd_point32_t; 
 
 /**
 *	Block Imformation
 */
 typedef struct{
-	int b_number;	//block number
-	int flag;		//whether occupied£¬1 stands for occupied¡¢0 for not
+	int32_t b_number;	//block number
+	int32_t flag;		//whether occupied£¬1 stands for occupied¡¢0 for not
 } block;
 
 /**
 *	Block Group Information(50 blocks/group)
 */
 typedef struct{ 
-	int bg_number;      //block group number
-	int free_num;		//number of free blocks
-	int next;			//the next free block number of the next group
+	int32_t bg_number;      //block group number
+	int32_t free_num;		//number of free blocks
+	int32_t next;			//the next free block number of the next group
 	block free[BLOCK_GROUP_NUM];		//block address
 } block_group;
 
@@ -65,23 +65,23 @@ typedef struct{
 	char phydata[PHY_DATA_SIZE];		//allocation of datas
 	char inode_info[INODES_COUNT];		//allocation of inodes
 	char dir_info[DIR_COUNT];			//allocation of directories
-	int number_inode;           //number of free inode blocks
-	int number_dir;             //number of free dir blocks
-	int number_data;            //number of free data blocks
+	int32_t number_inode;           //number of free inode blocks
+	int32_t number_dir;             //number of free dir blocks
+	int32_t number_data;            //number of free data blocks
 } super_block;
 
 /**
 *	Inode Information
 */
 typedef struct{ 
-	int inode_number;		//inode number
-	int file_style;		//file type, 0 stand for a directory, 1 stand for a file 
-	int file_length;		//the length of the file
+	int32_t inode_number;		//inode number
+	int32_t file_style;		//file type, 0 stand for a directory, 1 stand for a file 
+	int32_t file_length;		//the length of the file
 	char file_mode[PERMISSIONS];		//permission  
-	int file_userid;		//user id
-	int file_groupid;		//group id
-	int file_address[DATA_COUNT];	//addressing, 3 level indirect addressing
-	int file_icount;		//link, directory doesn't have hard link, but file does
+	int32_t file_userid;		//user id
+	int32_t file_groupid;		//group id
+	int32_t file_address[DATA_COUNT];	//addressing, 3 level indirect addressing
+	int32_t file_icount;		//link, directory doesn't have hard link, but file does
 	char dir_name[DIR_NAME_LENGTH];		//parent directory
 	char time[64];
 } inode;
@@ -91,7 +91,7 @@ typedef struct{
 */
 typedef struct{ 
 	char file_name[FILE_NAME_LENGTH];		//file name
-	int  dir_inode;			//inode number(start from 0)
+	int32_t  dir_inode;			//inode number(start from 0)
 } dir;
 
 /**
@@ -105,15 +105,15 @@ typedef struct{
 *	System open table Information
 */
 typedef struct{
-	int  f_inode;		//pointer, point to active inode
-	int f_count;       //shared?
+	int32_t  f_inode;		//point32_ter, point32_t to active inode
+	int32_t f_count;       //shared?
 } SystemOpenTable;
 
 /**
 *	User open table
 */
 typedef struct user_opentable{
-	int point[USER_ALLOW_OPEN_COUNT];	//pointer, point to system open table(25 files/user)
+	int32_t point32_t[USER_ALLOW_OPEN_COUNT];	//point32_ter, point32_t to system open table(25 files/user)
 } UserOpenTable;
 
 /**
@@ -144,5 +144,5 @@ typedef struct{
 typedef struct{
 	path *base;
 	path *top;
-	int stacksize;
+	int32_t stacksize;
 } SqStack;
