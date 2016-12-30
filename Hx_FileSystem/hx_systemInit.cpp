@@ -114,8 +114,6 @@ void InitSystem(FILE *fp){
 	InitCommand();
 	InitStack(cur_dir);      //Init stack path
 	push(cur_dir, "root");
-	file_dir;
-	file_inode;
 	InitfileTree(L_Ftree);
 	InitUsers();			//Init users
 	WriteToFile(fp);
@@ -276,20 +274,16 @@ void InitDisks(){
 void InitUsers()
 {
 	FILE *fps;
-	// 判断用户信息文件是否存在,如果用户文件存在,就通过read函数将用户的信息从文件中读取并存入User数据结构中
 	if ((fps = fopen("disk.han", "rb")) == NULL){
-		L_user[0].userid = 0;						//不存在，则初始化1个用户,userid从0开始
+		L_user[0].userid = 0;
 		strcpy(L_user[0].username, "admin");
 		strcpy(L_user[0].password, "admin");
-		//strcpy(L_user[0].username,"1");
-		//strcpy(L_user[0].password,"1");
 		L_user[0].group = 1;
 		L_user[0].level = 1;
-		//除了初始化时生成的超级管理员之外,其余用户空间都值为负值,等待用户创建
 		for (int32_t i = 1;i<USER_COUNT;i++)
 		{
 			L_user[i].userid = -1;
-			strcpy(L_user[i].username, "");//用户名以及密码都设置为空
+			strcpy(L_user[i].username, "");
 			strcpy(L_user[i].password, "");
 			L_user[i].group = -1;
 			L_user[i].level = -1;
@@ -314,7 +308,7 @@ void InitTable(){
 	//Init user open table
 	for (i = 0;i<USER_COUNT;i++)
 		for (j = 0;j<USER_ALLOW_OPEN_COUNT;j++)
-			user_open_table[i].point32_t[j] = -1;
+			user_open_table[i].point[j] = -1;
 	//Init system open table
 	for (i = 0; i<SYSTEM_ALLOW_OPEN_COUNT; i++){
 		sys_open_table[i].f_inode = -1;
@@ -336,4 +330,3 @@ void InitTable(){
 		active_inode_table.activeinode[i].file_groupid = -1;		//group id
 	}
 }
-

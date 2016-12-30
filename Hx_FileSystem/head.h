@@ -25,18 +25,18 @@ using namespace std;
 */
 typedef struct{
 	char username[USER_NAME_LENGTH];	//Username
-	char password[USER_PASSWORD_LENGTH];	//password
-	char level;			//level£¬root: 1 & common user: 0
+	char password[USER_PASSWORD_LENGTH];//password
+	char level;				//level£¬root: 1 & common user: 0
 	int32_t userid;			//user's id(start from 0)
 	int32_t group;			//group number
-} usernote,* userpoint32_t;
+} usernote,* userpoint;
 
 /**
 *	Commands Information
 */
 typedef struct{ 
 	char com[CMD_LENGTH];
-} Sys_cmd,* Sys_cmd_point32_t; 
+} Sys_cmd,* Sys_cmd_point; 
 
 /**
 *	Block Imformation
@@ -95,7 +95,7 @@ typedef struct{
 } dir;
 
 /**
-*	Data block Information(512B)
+*	Data block Information
 */
 typedef struct{
 	char p[DATA_BLOCK_SIZE];
@@ -105,7 +105,7 @@ typedef struct{
 *	System open table Information
 */
 typedef struct{
-	int32_t  f_inode;		//point32_ter, point32_t to active inode
+	int32_t  f_inode;		//pointer, point to active inode
 	int32_t f_count;       //shared?
 } SystemOpenTable;
 
@@ -113,7 +113,7 @@ typedef struct{
 *	User open table
 */
 typedef struct user_opentable{
-	int32_t point32_t[USER_ALLOW_OPEN_COUNT];	//point32_ter, point32_t to system open table(25 files/user)
+	int32_t point[USER_ALLOW_OPEN_COUNT];	//pointer, point to system open table(25 files/user)
 } UserOpenTable;
 
 /**

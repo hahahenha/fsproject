@@ -1481,20 +1481,20 @@ void manage_user()
 			printf("Please input user name:");
 			scanf("%s", &tempuser);
 			printf("Please input password:");
-			j = 0;
+			i = 0;
 			//get password
-			while ((temppass[j] = getch()) != '\r') {
-				if (temppass[j] == '\b') {
+			while ((temppass[i] = getch()) != '\r') {
+				if (temppass[i] == '\b') {
 					printf("\b \b");
-					temppass[j--] = '\0';
-					temppass[j] = '\0';
+					temppass[i--] = '\0';
+					temppass[i] = '\0';
 				}
 				else {
 					printf("*");
-					j++;
+					i++;
 				}
 			}
-			temppass[j] = '\0';
+			temppass[i] = '\0';
 			printf("\n");
 			printf("Please input group(1,2,3):");
 			scanf("%d", &tempgroup);

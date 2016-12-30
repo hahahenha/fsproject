@@ -206,7 +206,7 @@ void r_u(int32_t a, char* word) {
 //read users information
 void ReadUsers() {
 	char filename[] = "pw";
-	char word[FILE_BUFFER];
+	char word[FILE_BUFFER] = { 0 };
 	int32_t a;     //inode number
 	FTreepoint p = NULL, p2 = NULL;
 	path_tnode(cur_dir, L_Ftree, p);
@@ -247,6 +247,7 @@ void ReadUsers() {
 					}
 					L_user[z].group = -1;
 					L_user[z].level = -1;
+					z++;
 				}
 				return;
 			}

@@ -51,7 +51,7 @@ int32_t find_free_inode(){
 int32_t cul_num_usetalbe(int32_t i) {  
 	int32_t num = 0;
 	for (int32_t j = 0;j < USER_ALLOW_OPEN_COUNT;j++) {
-		if (user_open_table[i].point32_t[j] > -1) {
+		if (user_open_table[i].point[j] > -1) {
 			num++;
 		}
 	}
@@ -128,8 +128,8 @@ int32_t insertSysTable(int32_t a) {
 //insert inode to user open table
 void InsertUserTable(int32_t a, int32_t i){
 	for (int32_t j = 0;j<USER_ALLOW_OPEN_COUNT;j++){
-		if (user_open_table[i].point32_t[j] == -1){
-			user_open_table[i].point32_t[j] = insertSysTable(a);
+		if (user_open_table[i].point[j] == -1){
+			user_open_table[i].point[j] = insertSysTable(a);
 			return;
 		}
 	}
@@ -166,8 +166,8 @@ void DelSysTable(int32_t a) {
 //delete from user open table
 void DelUserTable(int32_t a, int32_t i) { 
 	for (int32_t j = 0;j < USER_ALLOW_OPEN_COUNT;j++) {
-		if ((user_open_table[i].point32_t[j] > -1) && (sys_open_table[user_open_table[i].point32_t[j]].f_inode == a)) {
-			user_open_table[i].point32_t[j] = -1;
+		if ((user_open_table[i].point[j] > -1) && (sys_open_table[user_open_table[i].point[j]].f_inode == a)) {
+			user_open_table[i].point[j] = -1;
 			DelSysTable(a);
 			return;
 		}

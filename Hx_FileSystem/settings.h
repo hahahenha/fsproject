@@ -74,7 +74,7 @@
 /*
 *	The maximum number of the file system users.
 */
-#define USER_COUNT 2
+#define USER_COUNT 4
 /*
 *	The maximum number of files allowing to access.
 */
