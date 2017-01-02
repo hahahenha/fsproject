@@ -71,7 +71,7 @@ typedef struct{
 } super_block;
 
 /**
-*	Inode Information
+*	Inode Information(128bit)
 */
 typedef struct{ 
 	int32_t inode_number;		//inode number
@@ -83,7 +83,7 @@ typedef struct{
 	int32_t file_address[DATA_COUNT];	//addressing, 3 level indirect addressing
 	int32_t file_icount;		//link, directory doesn't have hard link, but file does
 	char dir_name[DIR_NAME_LENGTH];		//parent directory
-	char time[64];
+	char time[57];
 } inode;
 
 /**

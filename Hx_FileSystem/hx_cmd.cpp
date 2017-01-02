@@ -417,7 +417,7 @@ void create_file(char filename[]){
 		file_inode[a].file_groupid = cur_user.group;
 		file_inode[a].file_userid = cur_user.userid;
 		time_t t = time(0);
-		strftime(file_inode[a].time, sizeof(file_inode[a].time), "%Y/%m/%d %X %A %jday of the current year %z", localtime(&t));
+		strftime(file_inode[a].time, sizeof(file_inode[a].time), "%Y/%m/%d %X %A %jday %z", localtime(&t));
 		//puts(file_inode[a].time);
 	}
 	int32_t i = 0;
@@ -1162,7 +1162,7 @@ void show_info()
 
 	printf("\t*************************\n");
 	printf("\tSystem open file information:\n\n");
-	printf("\tCurrent user open table:\t");
+	printf("\tCurrent user open table:");
 	printf("%d\n", cul_num_usetalbe(cur_user.userid));
 	printf("\tSystem open table:\t");
 	printf("%d\n", cul_num_systable());
@@ -1301,7 +1301,7 @@ void change_mode(char filename[])
 						scanf("%d", &(file_inode[a].file_mode[j]));
 					}
 					time_t t = time(0);
-					strftime(file_inode[a].time, sizeof(file_inode[a].time), "%Y/%m/%d %X %A %jday of current year %z", localtime(&t));
+					strftime(file_inode[a].time, sizeof(file_inode[a].time), "%Y/%m/%d %X %A %jday %z", localtime(&t));
 					//puts(file_inode[a].time);
 					return;
 				}
@@ -1362,7 +1362,7 @@ void change_owner(char filename[])
 					file_inode[a].file_userid = L_user[i].userid;
 					file_inode[a].file_groupid = L_user[i].group;
 					time_t t = time(0);
-					strftime(file_inode[a].time, sizeof(file_inode[a].time), "%Y/%m/%d %X %A %jday of current year %z", localtime(&t));
+					strftime(file_inode[a].time, sizeof(file_inode[a].time), "%Y/%m/%d %X %A %jday %z", localtime(&t));
 					//puts(file_inode[a].time);
 					return;
 				}
@@ -1417,7 +1417,7 @@ void change_group(char filename[])
 					}
 					file_inode[a].file_groupid = gid;
 					time_t t = time(0);
-					strftime(file_inode[a].time, sizeof(file_inode[a].time), "%Y/%m/%d %X %A %jday of current year %z", localtime(&t));
+					strftime(file_inode[a].time, sizeof(file_inode[a].time), "%Y/%m/%d %X %A %jday %z", localtime(&t));
 					//puts(file_inode[a].time);
 					return;
 				}
