@@ -47,7 +47,6 @@ int32_t find_num_of_file()
 	return num;
 }
 
-
 void InitfileTree(FTreepoint &T)
 {
 	int32_t a = 0;

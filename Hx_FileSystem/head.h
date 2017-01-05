@@ -39,7 +39,7 @@ typedef struct{
 } Sys_cmd,* Sys_cmd_point; 
 
 /**
-*	Block Imformation
+*	Block Imformation(8)
 */
 typedef struct{
 	int32_t b_number;	//block number
@@ -47,13 +47,13 @@ typedef struct{
 } block;
 
 /**
-*	Block Group Information(50 blocks/group)
+*	Block Group Information(50 blocks/group)(8*BLOCK_GROUP_NUM+12)
 */
 typedef struct{ 
-	int32_t bg_number;      //block group number
-	int32_t free_num;		//number of free blocks
-	int32_t next;			//the next free block number of the next group
-	block free[BLOCK_GROUP_NUM];		//block address
+	int32_t bg_number;			//block group number
+	int32_t free_num;			//number of free blocks
+	int32_t next;				//the next free block number of the next group
+	block free[BLOCK_GROUP_NUM];//block address
 } block_group;
 
 /**
@@ -71,7 +71,7 @@ typedef struct{
 } super_block;
 
 /**
-*	Inode Information(128bit)
+*	Inode Information(128)
 */
 typedef struct{ 
 	int32_t inode_number;		//inode number

@@ -42,7 +42,7 @@
 /*
 *	Size of BLOCK_GTOUP
 */
-#define BLOCK_GROUP_SIZE (PHY_DATA_SIZE/DATA_BLOCK_SIZE)
+#define BLOCK_GROUP_SIZE (PHY_DATA_SIZE/BLOCK_GROUP_NUM+1)
 /*
 *	Number of adressing: 15.
 */

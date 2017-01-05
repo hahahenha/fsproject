@@ -222,7 +222,7 @@ void InitDisks(){
 		hx_superblock.phydata[i] = 0;
 	//Init super block
 	hx_superblock.special_stack.bg_number=1;
-	hx_superblock.special_stack.free_num= FREE_INODE_STACK_SIZE;
+	hx_superblock.special_stack.free_num= BLOCK_GROUP_NUM;
 	hx_superblock.special_stack.next=2;
 	for (i = 0;i < FREE_INODE_STACK_SIZE;i++) {
 		hx_superblock.special_stack.free[i].flag = 0;
@@ -230,13 +230,13 @@ void InitDisks(){
 		num++;
 	}
 	num=0;
-	for (i = 0;i < INODES_COUNT;i++) {
+	for (i = 0;i < BLOCK_GROUP_SIZE;i++) {
 		hx_superblock.memory[i].bg_number = i + 1;
-		hx_superblock.memory[i].free_num = FREE_INODE_STACK_SIZE;
+		hx_superblock.memory[i].free_num = BLOCK_GROUP_NUM;
 		hx_superblock.memory[i].next = i + 2;
 		if (i == INODES_COUNT - 1)
 			hx_superblock.memory[i].next = 0;
-		for (j = 0;j < FREE_INODE_STACK_SIZE;j++) {
+		for (j = 0;j < BLOCK_GROUP_NUM;j++) {
 			hx_superblock.memory[i].free[j].flag = 0;
 			hx_superblock.memory[i].free[j].b_number = num;
 			num++;
@@ -274,7 +274,7 @@ void InitDisks(){
 void InitUsers()
 {
 	FILE *fps;
-	if ((fps = fopen("disk.han", "rb")) == NULL){
+	if ((fps = fopen(DISK_NAME, "rb")) == NULL){
 		L_user[0].userid = 0;
 		strcpy(L_user[0].username, "admin");
 		strcpy(L_user[0].password, "admin");
@@ -330,3 +330,4 @@ void InitTable(){
 		active_inode_table.activeinode[i].file_groupid = -1;		//group id
 	}
 }
+

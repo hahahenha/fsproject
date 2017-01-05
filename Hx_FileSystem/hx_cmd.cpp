@@ -125,7 +125,6 @@ void help(){
 	printf("\t26.User Management Menu..........................(Muser)\n");
 }
 
-
 //login
 int32_t login(){
 	char username[2*USER_NAME_LENGTH];
@@ -193,7 +192,21 @@ void show_curdir(){
 	while (p != NULL){
 		if (file_inode[p->data.dir_inode].file_style == 1){
 			printf("\t%s ", p->data.file_name);
-			printf("\t%d\t%d\t", file_inode[p->data.dir_inode].file_style, file_inode[p->data.dir_inode].file_length);
+			printf("\t%d", file_inode[p->data.dir_inode].file_style);
+			int len;
+			if (file_inode[p->data.dir_inode].file_length <= DATA_COUNT - 3) {
+				len = file_inode[p->data.dir_inode].file_length * DATA_BLOCK_SIZE;
+			}
+			else if (file_inode[p->data.dir_inode].file_length <= DATA_COUNT - 2) {
+				len = (DATA_COUNT - 3) * DATA_BLOCK_SIZE + FIRST_INDIRECT_NUM * DATA_BLOCK_SIZE;
+			}
+			else if (file_inode[p->data.dir_inode].file_length <= DATA_COUNT - 1) {
+				len = (DATA_COUNT - 3 + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM) * DATA_BLOCK_SIZE;
+			}
+			else if (file_inode[p->data.dir_inode].file_length <= DATA_COUNT) {
+				len = (DATA_COUNT - 3 + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + THIRD_INDIRECT_NUM) * DATA_BLOCK_SIZE;
+			}
+			printf("\t%d\t", len);
 			for (i = 0;i<PERMISSIONS;i++){
 				printf("%c", file_inode[p->data.dir_inode].file_mode[i] + 48);
 			}
@@ -211,7 +224,6 @@ void show_curdir(){
 		p = p->rchild;
 	}
 }
-
 
 //go to pointed directory
 void go_dir(char filename[]){
@@ -241,7 +253,6 @@ void back_dir(){
 	}
 	pop(cur_dir, c);
 }
-
 //create directory
 void create_dir(char filename[]) {
 	FTreepoint p = NULL, p2 = NULL;
@@ -294,6 +305,19 @@ void create_dir(char filename[]) {
 //delete the content in directory
 void clear_inode_del(FTreepoint T){
 	if (T){
+		if (hx_superblock.special_stack.free_num < BLOCK_GROUP_NUM) {
+			hx_superblock.special_stack.free_num++;
+			hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 0;
+			hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number = file_inode[T->data.dir_inode].inode_number;
+		}
+		else {
+			while (hx_superblock.special_stack.free_num >= BLOCK_GROUP_NUM) {
+				hx_superblock.special_stack = hx_superblock.memory[hx_superblock.special_stack.bg_number - 1];
+			}
+			hx_superblock.special_stack.free_num = 1;
+			hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 0;
+			hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number = file_inode[T->data.dir_inode].inode_number;
+		}
 		file_inode[T->data.dir_inode].inode_number = -1;      //clear inode
 		clear_inode_del(T->lchild);
 		clear_inode_del(T->rchild);
@@ -321,6 +345,7 @@ void del_dir(char filename[]){
 	else {
 		p2 = p->lchild;
 		if ((strcmp(p2->data.file_name, filename) == 0) && (file_inode[p2->data.dir_inode].file_style == 0)){  //delete
+			
 			p->lchild = p2->rchild;
 		}
 		else{
@@ -372,8 +397,6 @@ void del_dir(char filename[]){
 	FILE *fp1 = new FILE();
 	WriteToFile(fp1);
 }
-
-
 //create a file
 void create_file(char filename[]){
 	FTreepoint p = NULL, p2 = NULL;
@@ -426,7 +449,6 @@ void create_file(char filename[]){
 	FILE *fp = new FILE();
 	WriteToFile(fp);
 }
-
 //free file/dir
 void free_disk(int32_t a)
 {
@@ -534,7 +556,6 @@ void free_disk(int32_t a)
 		file_inode[a].file_address[i] = -1;
 	}
 }
-
 //delete file
 void delete_file(char filename[]){
 	FTreepoint p = NULL, p2 = NULL, p3;
@@ -635,7 +656,6 @@ void delete_file(char filename[]){
 	FILE *fp1 = new FILE();
 	WriteToFile(fp1);
 }
-
 //open file
 void open_file(char filename[]){
 	int32_t a;//Inode number
@@ -674,7 +694,6 @@ void open_file(char filename[]){
 		printf(E14);
 	}
 }
-
 //close file
 void close_file(char filename[]){
 	int32_t a;
@@ -2021,7 +2040,6 @@ void do_file(char buff[])
 	findtreeinode(s, L_Ftree, p);
 	r_f(p->data.dir_inode);
 }
-
 //rename
 void rename(char filename[])
 {
@@ -2428,8 +2446,6 @@ void wc_f(int32_t a, char* buffer) {  //a:inode number
 		}
 	}
 }
-
-
 
 void copy_file(char filename[]) {
 	char buffer[FILE_BUFFER] = { 0 };
