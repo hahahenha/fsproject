@@ -14,11 +14,10 @@ extern SqStack cur_dir;     		//current directory
 extern Sys_cmd cmd[COM_NUM];		//25 commands
 extern usernote L_user[USER_COUNT];	//users array
 extern int32_t f_inode;					//current active inode number
-
+extern FILE *ff;					//disk
 extern super_block hx_superblock;   //super block
 extern inode file_inode[INODES_COUNT];	//inode
 extern dir file_dir[DIR_COUNT];			//directory
-extern physicalBlock phy[PHY_DATA_SIZE];//data
 
 extern char buffer[FILE_BUFFER];					//file content buffer
 
@@ -29,18 +28,18 @@ extern ActiveNode active_inode_table;		//active inode table
 extern FTreepoint L_Ftree;                 //file tree
 
 //File operating
-void ReadFromFile(FILE *fp);	//read file
-void WriteToFile(FILE *fp);		//write file
+void ReadFromFile();	//read file
+void WriteToFile();		//write file
 void ReadUsers();		//get users
 void SaveUsers();		//save users
 
 								//Init function
-void InitSystem(FILE *fp);		//Init system
+void InitSystem();		//Init system
 void InitDisks();				//Init disk
 void InitUsers();				//Init users
 void InitTable();				//Init table
 void InitCommand();				//Init command
-void shell(FILE *fp);			//Init shell
+void shell();			//Init shell
 
 //cmd
 int32_t login();					//login function
@@ -58,8 +57,8 @@ void close_file(char tmp[]);	//close a file
 void delete_file(char tmp[]);	//delete a file
 void copy_file(char tmp[]);		//copy a file
 void show_info();				//show system information
-void logout(FILE *fp);			//logout
-int32_t change_user(FILE *fp, char tmp[]);	//change user
+void logout();			//logout
+int32_t change_user(char tmp[]);	//change user
 void change_mode(char tmp[]);	//chang file mode
 void change_owner(char filename[]);//change file owner
 void change_group(char filename[]);//change file group
@@ -299,8 +298,7 @@ void create_dir(char filename[]) {
 	int32_t i = 0;
 	clear_dir(file_dir);
 	Tree_to_dir(i, file_dir, L_Ftree->lchild);
-	FILE *fp = new FILE();
-	WriteToFile(fp);
+	WriteToFile();
 }
 //delete the content in directory
 void clear_inode_del(FTreepoint T){
@@ -391,11 +389,25 @@ void del_dir(char filename[]){
 		else printf(E12);
 	}
 	if (p2 == NULL) { printf(E11); return; }
+	else {
+		if (hx_superblock.special_stack.free_num < 50) {
+			hx_superblock.special_stack.free_num++;
+			hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 0;
+			hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number = p2->data.dir_inode;
+		}
+		else {
+			while (hx_superblock.special_stack.bg_number - 1 != 0 && hx_superblock.special_stack.free_num >= 50) {
+				hx_superblock.special_stack = hx_superblock.memory[hx_superblock.special_stack.bg_number - 1];
+			}
+			hx_superblock.special_stack.free_num = 1;
+			hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 0;
+			hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number = p2->data.dir_inode;
+		}
+	}
 	int32_t i = 0;
 	clear_dir(file_dir);
 	Tree_to_dir(i, file_dir, L_Ftree->lchild);
-	FILE *fp1 = new FILE();
-	WriteToFile(fp1);
+	WriteToFile();
 }
 //create a file
 void create_file(char filename[]){
@@ -446,8 +458,7 @@ void create_file(char filename[]){
 	int32_t i = 0;
 	clear_dir(file_dir);
 	Tree_to_dir(i, file_dir, L_Ftree->lchild);
-	FILE *fp = new FILE();
-	WriteToFile(fp);
+	WriteToFile();
 }
 //free file/dir
 void free_disk(int32_t a)
@@ -457,102 +468,120 @@ void free_disk(int32_t a)
 	for (i = 0;i<DATA_COUNT-3;i++){
 		if (file_inode[a].file_address[i] == -1) break;
 		else{
-			hx_superblock.phydata[file_inode[a].file_address[i]] = 0;
+			if (hx_superblock.special_stack.free_num < 50) {
+				hx_superblock.special_stack.free_num++;
+				hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 0;
+				hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number = file_inode[a].file_address[i];
+			}
+			else {
+				while (hx_superblock.special_stack.bg_number - 1 != 0 && hx_superblock.special_stack.free_num >= 50) {
+					hx_superblock.special_stack = hx_superblock.memory[hx_superblock.special_stack.bg_number-1];
+				}
+				if (hx_superblock.special_stack.bg_number - 1 <= 0) return;
+				hx_superblock.special_stack.free_num = 1;
+				hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 0;
+				hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number = file_inode[a].file_address[i];
+			}
 		}
 	}
 	//first level addressing
-	if (file_inode[a].file_address[DATA_COUNT-3] != -1){
-		int32_t f1[FIRST_INDIRECT_NUM];
-		char b1[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE/FIRST_INDIRECT_NUM];
-		for (i = 0;i<DATA_BLOCK_SIZE/FIRST_INDIRECT_NUM;i++){
-			for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
-				b1[j][i] = phy[file_inode[a].file_address[DATA_COUNT-3]].p[i+(j % FIRST_INDIRECT_NUM)*(DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM)];
+	if (file_inode[a].file_address[DATA_COUNT - 3] != -1) {
+		char cbuf[DATA_BLOCK_SIZE] = { 0 };
+		int32_t f1[INDIRECT_NUM] = { 0 };
+		fseek(ff, PHY_DATA_START + file_inode[a].file_address[DATA_COUNT - 3] * DATA_BLOCK_SIZE, SEEK_SET);
+		fread(f1, sizeof(f1), 1, ff);
+		for (i = 0;i < INDIRECT_NUM;i++) {
+			if (hx_superblock.special_stack.free_num < 50) {
+				hx_superblock.special_stack.free_num++;
+				hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 0;
+				hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number = f1[i];
 			}
-		}
-		hx_superblock.phydata[file_inode[a].file_address[DATA_COUNT - 3]] = 0;
-		for (i = 0;i<FIRST_INDIRECT_NUM;i++){
-			f1[i] = atoi(b1[i]);
-		}
-		for (i = 0;i<FIRST_INDIRECT_NUM;i++){
-			hx_superblock.phydata[f1[i]] = 0;
+			else {
+				while (hx_superblock.special_stack.bg_number - 1 != 0 && hx_superblock.special_stack.free_num >= 50) {
+					hx_superblock.special_stack = hx_superblock.memory[hx_superblock.special_stack.bg_number - 1];
+				}
+				hx_superblock.special_stack.free_num = 1;
+				hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 0;
+				hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number = f1[i];
+			}
 		}
 	}
 	//second level addressing
 	if (file_inode[a].file_address[DATA_COUNT-2] != -1){
-		int32_t f1[FIRST_INDIRECT_NUM];
-		char b1[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM];
-		for (i = 0;i<DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM;i++){
-			for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
-				b1[j][i] = phy[file_inode[a].file_address[DATA_COUNT - 2]].p[i + (j % FIRST_INDIRECT_NUM)*(DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM)];
+		//first level indirect addressing 
+		int32_t f1[INDIRECT_NUM] = { 0 }, i, j;
+		fseek(ff, PHY_DATA_START + file_inode[a].file_address[DATA_COUNT - 2] * DATA_BLOCK_SIZE, SEEK_SET);
+		fread(f1, sizeof(f1), 1, ff);
+		//second level indirect addressing
+		int32_t f2[INDIRECT_NUM] = { 0 };
+		bool flag = 0;
+		for (i = 0; i < INDIRECT_NUM; i++) {
+			fseek(ff, PHY_DATA_START + f1[i] * DATA_BLOCK_SIZE, SEEK_SET);
+			fread(f2, sizeof(f2), 1, ff);
+			for (i = 0;i < INDIRECT_NUM;i++) {
+				if (hx_superblock.special_stack.free_num < 50) {
+					hx_superblock.special_stack.free_num++;
+					hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 0;
+					hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number = f2[i];
+				}
+				else {
+					while (hx_superblock.special_stack.bg_number - 1 != 0 && hx_superblock.special_stack.free_num >= 50) {
+						hx_superblock.special_stack = hx_superblock.memory[hx_superblock.special_stack.bg_number - 1];
+					}
+					hx_superblock.special_stack.free_num = 1;
+					hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 0;
+					hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number = f2[i];
+				}
 			}
-		}
-		hx_superblock.phydata[file_inode[a].file_address[DATA_COUNT - 2]] = 0;
-		for (i = 0;i<FIRST_INDIRECT_NUM;i++){
-			f1[i] = atoi(b1[i]);
-		}
-		for (i = 0;i<FIRST_INDIRECT_NUM;i++){
-			hx_superblock.phydata[f1[i]] = 0;
-		}
-		int32_t f2[SECOND_INDIRECT_NUM];
-		char b2[SECOND_INDIRECT_NUM][DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM/FIRST_INDIRECT_NUM)];
-		for (i = 0;i<DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM);i++){
-			for (j = 0; j < SECOND_INDIRECT_NUM; j++) {
-				b2[j][i] = phy[f1[j / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)]].p[i + (j % (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM))*DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)];
-			}
-		}
-		for (i = 0;i<SECOND_INDIRECT_NUM;i++){
-			f2[i] = atoi(b2[i]);
-		}
-
-		for (i = 0;i<SECOND_INDIRECT_NUM;i++){
-			hx_superblock.phydata[f2[i]] = 0;
 		}
 	}
 	//third level addressing
-	if (file_inode[a].file_address[DATA_COUNT-1] != -1){
-		int32_t f1[FIRST_INDIRECT_NUM];
-		char b1[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM];
-		for (i = 0;i<DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM;i++) {
-			for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
-				b1[j][i] = phy[file_inode[a].file_address[DATA_COUNT - 1]].p[i + (j % FIRST_INDIRECT_NUM)*(DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM)];
+	if (file_inode[a].file_address[DATA_COUNT - 1] != -1) {
+		//first level indirect addressing 
+		int32_t f1[INDIRECT_NUM] = { 0 }, i, j, k;
+		fseek(ff, PHY_DATA_START + file_inode[a].file_address[DATA_COUNT - 1] * DATA_BLOCK_SIZE, SEEK_SET);
+		fread(f1, sizeof(f1), 1, ff);
+		//second level indirect addressing
+		int32_t f2[INDIRECT_NUM] = { 0 }, f3[INDIRECT_NUM] = { 0 };
+		bool flag = 0;
+		for (i = 0; i < INDIRECT_NUM; i++) {
+			fseek(ff, PHY_DATA_START + f1[i] * DATA_BLOCK_SIZE, SEEK_SET);
+			fread(f2, sizeof(f2), 1, ff);
+			for (j = 0;j < INDIRECT_NUM;j++) {
+				fseek(ff, PHY_DATA_START + f2[j] * DATA_BLOCK_SIZE, SEEK_SET);
+				fread(f3, sizeof(f3), 1, ff);
+				for (i = 0;i < INDIRECT_NUM;i++) {
+					if (hx_superblock.special_stack.free_num < 50) {
+						hx_superblock.special_stack.free_num++;
+						hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 0;
+						hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number = f3[i];
+					}
+					else {
+						while (hx_superblock.special_stack.bg_number - 1 != 0 && hx_superblock.special_stack.free_num >= 50) {
+							hx_superblock.special_stack = hx_superblock.memory[hx_superblock.special_stack.bg_number - 1];
+						}
+						hx_superblock.special_stack.free_num = 1;
+						hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 0;
+						hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number = f3[i];
+					}
+				}
 			}
-		}
-		hx_superblock.phydata[file_inode[a].file_address[DATA_COUNT - 1]] = 0;
-		for (i = 0;i<FIRST_INDIRECT_NUM;i++) {
-			f1[i] = atoi(b1[i]);
-		}
-		for (i = 0;i<FIRST_INDIRECT_NUM;i++) {
-			hx_superblock.phydata[f1[i]] = 0;
-		}
-		int32_t f2[SECOND_INDIRECT_NUM];
-		char b2[SECOND_INDIRECT_NUM][DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)];
-		for (i = 0;i<DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM);i++) {
-			for (j = 0; j < SECOND_INDIRECT_NUM; j++) {
-				b2[j][i] = phy[f1[j / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)]].p[i + (j % (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM))*DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)];
-			}
-		}
-		for (i = 0;i<SECOND_INDIRECT_NUM;i++) {
-			f2[i] = atoi(b2[i]);
-		}
-
-		for (i = 0;i<SECOND_INDIRECT_NUM;i++) {
-			hx_superblock.phydata[f2[i]] = 0;
-		}
-		int32_t f3[THIRD_INDIRECT_NUM];
-		char b3[THIRD_INDIRECT_NUM][DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM/SECOND_INDIRECT_NUM)];
-		for (i = 0;i<DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM);i++){
-			for (j = 0; j < THIRD_INDIRECT_NUM; j++) {
-				b3[j][i] = phy[f2[j / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM)]].p[i + (DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM))*(j % (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM))];
-			}
-		}
-		for (i = 0;i<THIRD_INDIRECT_NUM;i++){
-			f3[i] = atoi(b3[i]);
-		}
-		for (i = 0;i<THIRD_INDIRECT_NUM;i++){
-			hx_superblock.phydata[f3[i]] = 0;
 		}
 	}
-	for (i = 0;i<DATA_COUNT;i++){
+	for (i = DATA_COUNT - 3;i<DATA_COUNT;i++){
+		if (hx_superblock.special_stack.free_num < 50) {
+			hx_superblock.special_stack.free_num++;
+			hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 0;
+			hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number = file_inode[a].file_address[i];
+		}
+		else {
+			while (hx_superblock.special_stack.bg_number - 1 != 0 && hx_superblock.special_stack.free_num >= 50) {
+				hx_superblock.special_stack = hx_superblock.memory[hx_superblock.special_stack.bg_number - 1];
+			}
+			hx_superblock.special_stack.free_num = 1;
+			hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 0;
+			hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number = file_inode[a].file_address[i];
+		}
 		file_inode[a].file_address[i] = -1;
 	}
 }
@@ -650,11 +679,25 @@ void delete_file(char filename[]){
 
 	}
 	if (p2 == NULL) { printf(E11); return; }
+	else {
+		if (hx_superblock.special_stack.free_num < 50) {
+			hx_superblock.special_stack.free_num++;
+			hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 0;
+			hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number = p2->data.dir_inode;
+		}
+		else {
+			while (hx_superblock.special_stack.bg_number - 1 != 0 && hx_superblock.special_stack.free_num >= 50) {
+				hx_superblock.special_stack = hx_superblock.memory[hx_superblock.special_stack.bg_number - 1];
+			}
+			hx_superblock.special_stack.free_num = 1;
+			hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 0;
+			hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number = p2->data.dir_inode;
+		}
+	}
 	int32_t i = 0;
 	clear_dir(file_dir);
 	Tree_to_dir(i, file_dir, L_Ftree->lchild);
-	FILE *fp1 = new FILE();
-	WriteToFile(fp1);
+	WriteToFile();
 }
 //open file
 void open_file(char filename[]){
@@ -738,112 +781,98 @@ void r_f(int32_t a){
 	printf("File content£º\n");
 	int32_t b = file_inode[a].file_length, i, j;
 	if (b < DATA_COUNT-2){
+		char cbuf[DATA_BLOCK_SIZE];
 		for (i = 0;i < b;i++){
-			for (j = 0;j < DATA_BLOCK_SIZE;j++){
-				if (phy[file_inode[a].file_address[i]].p[j] == 0) return;
-				printf("%c", phy[file_inode[a].file_address[i]].p[j]);
+			fseek(ff, PHY_DATA_START + file_inode[a].file_address[i] * DATA_BLOCK_SIZE, SEEK_SET);
+			fread(cbuf, sizeof(cbuf), 1, ff);
+			for (int t = 0; t < DATA_BLOCK_SIZE; t++) {
+				if (cbuf[t] == 0) break;
+				printf("%c", cbuf[t]);
 			}
 		}
 	}
 	else{
+		char cbuf[DATA_BLOCK_SIZE] = { 0 };
 		for (i = 0;i < DATA_COUNT-3;i++){
-			for (j = 0;j < DATA_BLOCK_SIZE;j++){
-				if (phy[file_inode[a].file_address[i]].p[j] == 0) return;
-				printf("%c", phy[file_inode[a].file_address[i]].p[j]);
+			fseek(ff, PHY_DATA_START + file_inode[a].file_address[i] * DATA_BLOCK_SIZE, SEEK_SET);
+			fread(cbuf, sizeof(cbuf), 1, ff);
+			for (int t = 0; t < DATA_BLOCK_SIZE; t++) {
+				if (cbuf[t] == 0) break;
+				printf("%c", cbuf[t]);
 			}
 		}
 	}
 	if (b >= DATA_COUNT-2){
-		int32_t f1[FIRST_INDIRECT_NUM];
-		char b1[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM];
-		for (i = 0;i < DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM;i++){
-			for (j = 0; j < FIRST_INDIRECT_NUM; j++)
-				b1[j][i] = phy[file_inode[a].file_address[DATA_COUNT - 3]].p[i + (DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM)*(j%FIRST_INDIRECT_NUM)];
-		}
-		for (i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			f1[i] = atoi(b1[i]);
-		}
-		for (i = 0;i < FIRST_INDIRECT_NUM;i++){
-			for (int32_t j = 0;j < DATA_BLOCK_SIZE;j++){
-				if (phy[f1[i]].p[j] == 0) return;
-				printf("%c", phy[f1[i]].p[j]);
+		char cbuf[DATA_BLOCK_SIZE] = { 0 };
+		int32_t f1[INDIRECT_NUM] = { 0 };
+		fseek(ff, PHY_DATA_START + file_inode[a].file_address[DATA_COUNT - 3] * DATA_BLOCK_SIZE, SEEK_SET);
+		fread(f1, sizeof(f1), 1, ff);
+		for (i = 0;i < INDIRECT_NUM;i++){
+			fseek(ff, PHY_DATA_START + f1[i] * DATA_BLOCK_SIZE, SEEK_SET);
+			fread(cbuf, sizeof(cbuf), 1, ff);
+			for (int t = 0; t < DATA_BLOCK_SIZE; t++) {
+				if (cbuf[t] == 0) break;
+				printf("%c", cbuf[t]);
 			}
 		}
 	}
 	if (b >= DATA_COUNT-1){
+		char cbuf[DATA_BLOCK_SIZE] = { 0 };
 		//first level indirect addressing 
-		int32_t f1[FIRST_INDIRECT_NUM], i, j;
-		char b1[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM];
-		for (i = 0;i < DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM;i++) {
-			for (j = 0; j < FIRST_INDIRECT_NUM; j++)
-				b1[j][i] = phy[file_inode[a].file_address[DATA_COUNT - 2]].p[i + (DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM)*(j%FIRST_INDIRECT_NUM)];
-		}
-		for (i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			f1[i] = atoi(b1[i]);
-		}
-
+		int32_t f1[INDIRECT_NUM] = { 0 }, i, j;
+		fseek(ff, PHY_DATA_START + file_inode[a].file_address[DATA_COUNT - 2] * DATA_BLOCK_SIZE, SEEK_SET);
+		fread(f1, sizeof(f1), 1, ff);
 		//second level indirect addressing
-		int32_t f2[SECOND_INDIRECT_NUM];
-		char b2[SECOND_INDIRECT_NUM][DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM/FIRST_INDIRECT_NUM)];
-		for (j = 0;j < DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM);j++){
-			for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
-				b2[i][j] = phy[f1[i / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)]].p[j + DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM) * (i % (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM))];
+		int32_t f2[INDIRECT_NUM] = { 0 };
+		bool flag = 0;
+		for (i = 0; i < INDIRECT_NUM; i++) {
+			fseek(ff, PHY_DATA_START + f1[i] * DATA_BLOCK_SIZE, SEEK_SET);
+			fread(f2, sizeof(f2), 1, ff);
+			for (j = 0;j < INDIRECT_NUM;j++) {
+				fseek(ff, PHY_DATA_START + f2[j] * DATA_BLOCK_SIZE, SEEK_SET);
+				fread(cbuf, sizeof(cbuf), 1, ff);
+				for (int t = 0; t < DATA_BLOCK_SIZE; t++) {
+					if (cbuf[t] == 0) {
+						flag = 1;
+						break;
+					}
+					printf("%c", cbuf[t]);
+				}
+				if (flag) break;
 			}
-		}
-		for (i = 0;i < SECOND_INDIRECT_NUM;i++){
-			f2[i] = atoi(b2[i]);
-		}
-
-		for (i = 0;i < SECOND_INDIRECT_NUM;i++){
-			for (j = 0;j < DATA_BLOCK_SIZE;j++){
-				if (phy[f2[i]].p[j] == 0) return;
-				printf("%c", phy[f2[i]].p[j]);
-			}
+			if (flag) break;
 		}
 	}
-	if (b >= DATA_COUNT){
-		//first level indirect addressing
-		int32_t f1[FIRST_INDIRECT_NUM], i, j;
-		char b1[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE/ FIRST_INDIRECT_NUM];
-		for (i = 0;i < DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM;i++){
-			for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
-				b1[j][i] = phy[file_inode[a].file_address[DATA_COUNT - 1]].p[i + DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM*(j%FIRST_INDIRECT_NUM)];
+	if (b >= DATA_COUNT) {
+		char cbuf[DATA_BLOCK_SIZE] = { 0 };
+		//first level indirect addressing 
+		int32_t f1[INDIRECT_NUM] = { 0 }, i, j, k;
+		fseek(ff, PHY_DATA_START + file_inode[a].file_address[DATA_COUNT - 1] * DATA_BLOCK_SIZE, SEEK_SET);
+		fread(f1, sizeof(f1), 1, ff);
+		//second level indirect addressing
+		int32_t f2[INDIRECT_NUM] = { 0 }, f3[INDIRECT_NUM] = { 0 };
+		bool flag = 0;
+		for (i = 0; i < INDIRECT_NUM; i++) {
+			fseek(ff, PHY_DATA_START + f1[i] * DATA_BLOCK_SIZE, SEEK_SET);
+			fread(f2, sizeof(f2), 1, ff);
+			for (j = 0;j < INDIRECT_NUM;j++) {
+				fseek(ff, PHY_DATA_START + f2[j] * DATA_BLOCK_SIZE, SEEK_SET);
+				fread(f3, sizeof(f3), 1, ff);
+				for (k = 0;k < INDIRECT_NUM;k++) {
+					fseek(ff, PHY_DATA_START + f3[k] * DATA_BLOCK_SIZE, SEEK_SET);
+					fread(cbuf, sizeof(cbuf), 1, ff);
+					for (int t = 0; t < DATA_BLOCK_SIZE; t++) {
+						if (cbuf[t] == 0) {
+							flag = 1;
+							break;
+						}
+						printf("%c", cbuf[t]);
+					}
+					if (flag) break;
+				}
+				if (flag) break;
 			}
-		}
-		for (i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			f1[i] = atoi(b1[i]);
-		}
-
-		//second level indirect addressing 
-		int32_t f2[SECOND_INDIRECT_NUM];
-		char b2[SECOND_INDIRECT_NUM][DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)];
-		for (j = 0;j < DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM);j++){
-			for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
-				b2[i][j] = phy[f1[i/(SECOND_INDIRECT_NUM/FIRST_INDIRECT_NUM)]].p[j + DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM) * (i % (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM))];
-			}
-		}
-		for (i = 0;i < SECOND_INDIRECT_NUM;i++){
-			f2[i] = atoi(b2[i]);
-		}
-
-		//third level indirect addressing 
-		int32_t f3[THIRD_INDIRECT_NUM];
-		char b3[THIRD_INDIRECT_NUM][DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM/SECOND_INDIRECT_NUM)];
-		for (j = 0;j < DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM);j++){
-			for (i = 0; i < THIRD_INDIRECT_NUM; i++) {
-				b3[i][j] = phy[f2[i/(THIRD_INDIRECT_NUM/SECOND_INDIRECT_NUM)]].p[j + DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM) * (i% (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM))];
-			}
-		}
-		for (i = 0;i < THIRD_INDIRECT_NUM;i++){
-			f3[i] = atoi(b3[i]);
-		}
-
-
-		for (i = 0;i < THIRD_INDIRECT_NUM;i++){
-			for (j = 0;j < DATA_BLOCK_SIZE;j++){
-				if (phy[f3[i]].p[j] == 0) return;
-				printf("%c", phy[f3[i]].p[j]);
-			}
+			if (flag) break;
 		}
 	}
 }
@@ -892,10 +921,17 @@ void read_file(char filename[]){
 }
 
 int32_t find_super(){
-	for (int32_t i = 0;i<PHY_DATA_SIZE;i++){
-		if (hx_superblock.phydata[i] == 0){
-			return i;
+	if (hx_superblock.special_stack.free_num > 0) {
+		hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 1;
+		return BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num;
+	}
+	else {
+		while (hx_superblock.special_stack.free_num <= 0) {
+			hx_superblock.special_stack = hx_superblock.memory[hx_superblock.special_stack.next];
 		}
+		hx_superblock.special_stack.free_num = 50;
+		hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.bg_number].flag = 1;
+		return BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num;
 	}
 	return -1;
 }
@@ -923,20 +959,27 @@ void w_f(int32_t a){  //a:inode number
 		if (num % DATA_BLOCK_SIZE == 0){
 			for (int32_t i = 0;i < num / DATA_BLOCK_SIZE;i++){
 				file_inode[a].file_address[i] = find_super();
+				fseek(ff, PHY_DATA_START + find_super()*DATA_BLOCK_SIZE, SEEK_SET);
+				char cbuf[DATA_BLOCK_SIZE] = { 0 };
 				for (int32_t j = 0;j<DATA_BLOCK_SIZE;j++){
-					phy[find_super()].p[j] = buffer[i * DATA_BLOCK_SIZE + j];
+					cbuf[j] = buffer[i * DATA_BLOCK_SIZE + j];
 				}
-				hx_superblock.phydata[find_super()] = 1;
+				fwrite(cbuf, sizeof(cbuf), 1, ff);
+				find_free_inode();
 				file_inode[a].file_length++;
 			}
 		}
 		else{
 			for (int32_t i = 0;i<num / DATA_BLOCK_SIZE + 1;i++){
 				file_inode[a].file_address[i] = find_super();
+				fseek(ff, PHY_DATA_START + file_inode[a].file_address[i] * DATA_BLOCK_SIZE, SEEK_SET);
+				char cbuf[DATA_BLOCK_SIZE] = { 0 };
 				for (int32_t j = 0;j<DATA_BLOCK_SIZE;j++){
-					phy[find_super()].p[j] = buffer[i * DATA_BLOCK_SIZE + j];
+					if (i * DATA_BLOCK_SIZE + j > num) break;
+					cbuf[j] = buffer[i * DATA_BLOCK_SIZE + j];
 				}
-				hx_superblock.phydata[find_super()] = 1;
+				fwrite(cbuf, sizeof(cbuf), 1, ff);
+				find_free_inode();
 				file_inode[a].file_length++;
 			}
 		}
@@ -944,10 +987,13 @@ void w_f(int32_t a){  //a:inode number
 	else{
 		for (int32_t i = 0;i<DATA_COUNT-3;i++){
 			file_inode[a].file_address[i] = find_super();
+			fseek(ff, PHY_DATA_START + file_inode[a].file_address[i] * DATA_BLOCK_SIZE, SEEK_SET);
+			char cbuf[DATA_BLOCK_SIZE] = { 0 };
 			for (int32_t j = 0;j<DATA_BLOCK_SIZE;j++){
-				phy[find_super()].p[j] = buffer[i * DATA_BLOCK_SIZE + j];
+				cbuf[j] = buffer[i * DATA_BLOCK_SIZE + j];
 			}
-			hx_superblock.phydata[find_super()] = 1;
+			fwrite(cbuf, sizeof(cbuf), 1, ff);
+			find_free_inode();
 			file_inode[a].file_length++;
 		}
 	}
@@ -955,153 +1001,113 @@ void w_f(int32_t a){  //a:inode number
 	if (num>(DATA_COUNT - 3)*DATA_BLOCK_SIZE){
 		file_inode[a].file_address[DATA_COUNT - 3] = find_super();
 		file_inode[a].file_length++;
-		int32_t Inodenum[FIRST_INDIRECT_NUM];
-		for (int32_t i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			hx_superblock.phydata[find_super()] = 1;
+		int32_t Inodenum[INDIRECT_NUM] = { 0 };
+		for (int32_t i = 0; i < INDIRECT_NUM; i++) {
+			find_free_inode();
 			Inodenum[i] = find_super();
 		}
-		hx_superblock.phydata[find_super()] = 1;
-		char buf[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE/FIRST_INDIRECT_NUM] = { 0 };
-		for (int32_t i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			itoa(Inodenum[i], buf[i], DATA_BLOCK_SIZE);
-		}
+		find_free_inode();
 		int32_t i, j;
-		for (i = 0;i < DATA_BLOCK_SIZE; i++){
-			for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
-				phy[file_inode[a].file_address[DATA_COUNT - 3]].p[i + (DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM) * (j%FIRST_INDIRECT_NUM)] = buf[j][i];
-			}
-		}
+		fseek(ff, PHY_DATA_START + file_inode[a].file_address[DATA_COUNT - 3] * DATA_BLOCK_SIZE, SEEK_SET);
+		fwrite(Inodenum, sizeof(Inodenum), 1, ff);
 		//save
-		for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
+		for (j = 0; j < INDIRECT_NUM; j++) {
+			char cbuf[DATA_BLOCK_SIZE] = { 0 };
 			for (i = (DATA_COUNT - 3 + j)*DATA_BLOCK_SIZE; i < (DATA_COUNT - 2 + j) * DATA_BLOCK_SIZE; i++) {
 				if (i > num) {
+					cbuf[i - (DATA_COUNT - 3 + j)*DATA_BLOCK_SIZE] = 0;
 					flag = 1;
 					break;
 				}
-				phy[Inodenum[j]].p[i - (DATA_COUNT - 3 + j)*DATA_BLOCK_SIZE] = buffer[i];
+				cbuf[i - (DATA_COUNT - 3 + j)*DATA_BLOCK_SIZE] = buffer[i];
 			}
+			fseek(ff, PHY_DATA_START + Inodenum[j] * DATA_BLOCK_SIZE, SEEK_SET);
+			fwrite(cbuf, sizeof(cbuf), 1, ff);
 			if (flag) break;
 		}
 	}
 	if (num>(DATA_COUNT+FIRST_INDIRECT_NUM-3)*DATA_BLOCK_SIZE){
 		file_inode[a].file_address[DATA_COUNT - 2] = find_super();
 		file_inode[a].file_length++;
-		int32_t Inodenum[FIRST_INDIRECT_NUM];
-		for (int32_t i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			hx_superblock.phydata[find_super()] = 1;
+		int32_t Inodenum[INDIRECT_NUM] = { 0 };
+		for (int32_t i = 0; i < INDIRECT_NUM; i++) {
+			find_free_inode();
 			Inodenum[i] = find_super();
 		}
-		hx_superblock.phydata[find_super()] = 1;
-		char buf[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM] = { 0 };
-		for (int32_t i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			itoa(Inodenum[i], buf[i], DATA_BLOCK_SIZE);
-		}
-		int32_t i, j;
-		//first
-		for (i = 0;i < DATA_BLOCK_SIZE; i++) {
-			for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
-				phy[file_inode[a].file_address[DATA_COUNT - 2]].p[i + (DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM) * (j%FIRST_INDIRECT_NUM)] = buf[j][i];
-			}
-		}
-		for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
-			for (i = (DATA_COUNT + FIRST_INDIRECT_NUM - 3 + j)* DATA_BLOCK_SIZE; i < (DATA_COUNT + FIRST_INDIRECT_NUM + j - 2) * DATA_BLOCK_SIZE; i++) {
-				phy[Inodenum[j]].p[i - (DATA_COUNT + FIRST_INDIRECT_NUM - 3 + j)*DATA_BLOCK_SIZE] = buffer[i];
-			}
-		}
+		find_free_inode();
+		fseek(ff, PHY_DATA_START + file_inode[a].file_address[DATA_COUNT - 2] * DATA_BLOCK_SIZE, SEEK_SET);
+		fwrite(Inodenum, sizeof(Inodenum), 1, ff);
+		int32_t i, j, k;
 		//second
-		int32_t f[SECOND_INDIRECT_NUM];
-		for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
-			f[i] = find_super();
-			hx_superblock.phydata[f[i]] = 1;
-		}
-		char b[SECOND_INDIRECT_NUM][DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)] = { 0 };
-		for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
-			itoa(f[i], b[i], DATA_BLOCK_SIZE);
-		}
-		for (i = 0;i<DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM));i++){
-			for (j = 0; j < SECOND_INDIRECT_NUM; j++) {
-				phy[Inodenum[j/(SECOND_INDIRECT_NUM/FIRST_INDIRECT_NUM)]].p[i + (j% (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM))*DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)] = b[j][i];
+		int32_t f2[INDIRECT_NUM] = { 0 };
+		for (k = 0; k < INDIRECT_NUM; k++) {
+			for (i = 0; i < INDIRECT_NUM; i++) {
+				f2[i] = find_super();
+				find_free_inode();
 			}
-		}
-		//save
-		for (j = 0; j < SECOND_INDIRECT_NUM; j++) {
-			for (i = (DATA_COUNT + FIRST_INDIRECT_NUM + j - 3)*DATA_BLOCK_SIZE; i < (DATA_COUNT + FIRST_INDIRECT_NUM + j - 2)*DATA_BLOCK_SIZE;i++) {
-				if (i > num) {
-					flag = 1;
-					break;
+			fseek(ff, PHY_DATA_START + Inodenum[k] * DATA_BLOCK_SIZE, SEEK_SET);
+			fwrite(f2, sizeof(f2), 1, ff);
+			//save
+			for (j = 0; j < INDIRECT_NUM; j++) {
+				char cbuf[DATA_BLOCK_SIZE] = { 0 };
+				for (i = (DATA_COUNT - 3 + FIRST_INDIRECT_NUM + k * INDIRECT_NUM + j)*DATA_BLOCK_SIZE; i < (DATA_COUNT + FIRST_INDIRECT_NUM + k * INDIRECT_NUM - 2 + j) * DATA_BLOCK_SIZE; i++) {
+					if (i > num) {
+						cbuf[i - (DATA_COUNT + FIRST_INDIRECT_NUM + k * INDIRECT_NUM - 3 + j)*DATA_BLOCK_SIZE] = 0;
+						flag = 1;
+						break;
+					}
+					cbuf[i - (DATA_COUNT + FIRST_INDIRECT_NUM + k * INDIRECT_NUM - 3 + j)*DATA_BLOCK_SIZE] = buffer[i];
 				}
-				phy[f[j]].p[i - (DATA_COUNT + FIRST_INDIRECT_NUM + j - 3)*DATA_BLOCK_SIZE] = buffer[i];
+				fseek(ff, PHY_DATA_START + f2[j] * DATA_BLOCK_SIZE, SEEK_SET);
+				fwrite(cbuf, sizeof(cbuf), 1, ff);
+				if (flag) break;
 			}
-			if (flag) break;
 		}
 	}
 	if (num>(DATA_COUNT+FIRST_INDIRECT_NUM+SECOND_INDIRECT_NUM-3)*DATA_BLOCK_SIZE){
-		file_inode[a].file_address[DATA_COUNT-1] = find_super();
+		file_inode[a].file_address[DATA_COUNT - 1] = find_super();
 		file_inode[a].file_length++;
-
-		int32_t Inodenum[FIRST_INDIRECT_NUM];
-		for (int32_t i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			hx_superblock.phydata[find_super()] = 1;
+		int32_t Inodenum[INDIRECT_NUM] = { 0 };
+		for (int32_t i = 0; i < INDIRECT_NUM; i++) {
+			find_free_inode();
 			Inodenum[i] = find_super();
 		}
-		hx_superblock.phydata[find_super()] = 1;
-		char buf[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM] = { 0 };
-		for (int32_t i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			itoa(Inodenum[i], buf[i], DATA_BLOCK_SIZE);
-		}
-		int32_t i, j;
-		//first
-		for (i = 0;i < DATA_BLOCK_SIZE; i++) {
-			for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
-				phy[file_inode[a].file_address[DATA_COUNT - 1]].p[i + (DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM) * (j%FIRST_INDIRECT_NUM)] = buf[j][i];
-			}
-		}
-		for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
-			for (i = (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM - 3 + j)* DATA_BLOCK_SIZE; i < (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + j - 2) * DATA_BLOCK_SIZE; i++) {
-				phy[Inodenum[j]].p[i - (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM - 3 + j)*DATA_BLOCK_SIZE] = buffer[i];
-			}
-		}
-
+		find_free_inode();
+		fseek(ff, PHY_DATA_START + file_inode[a].file_address[DATA_COUNT - 1] * DATA_BLOCK_SIZE, SEEK_SET);
+		fwrite(Inodenum, sizeof(Inodenum), 1, ff);
+		int32_t i, j, k, p, q;
 		//second
-		int32_t f[SECOND_INDIRECT_NUM];
-		for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
-			f[i] = find_super();
-			hx_superblock.phydata[f[i]] = 1;
-		}
-		char b[SECOND_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM] = { 0 };
-		//memset(b, 0, sizeof(b));
-		for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
-			itoa(f[i], b[i], DATA_BLOCK_SIZE);
-		}
-		for (i = 0;i<DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM);i++) {
-			for (j = 0; j < SECOND_INDIRECT_NUM; j++) {
-				phy[Inodenum[j / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)]].p[i + (j % (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM))*DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)] = b[j][i];
+		int32_t f2[INDIRECT_NUM] = { 0 }, f3[INDIRECT_NUM];
+		for (k = 0; k <  INDIRECT_NUM; k++) {
+			for (i = 0; i < INDIRECT_NUM; i++) {
+				f2[i] = find_super();
+				find_free_inode();
 			}
-		}
-		//third
-		int32_t ff[THIRD_INDIRECT_NUM];
-		for (i = 0; i < THIRD_INDIRECT_NUM; i++) {
-			ff[i] = find_super();
-			hx_superblock.phydata[ff[i]] = 1;
-		}
-		char bb[THIRD_INDIRECT_NUM][DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM)] = {0};
-		//memset(bb, 0, sizeof(bb));
-		for (i = 0; i < THIRD_INDIRECT_NUM; i++) {
-			itoa(ff[i], bb[i], DATA_BLOCK_SIZE);
-		}
-		for (i = 0;i < DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM);i++) {
-			for (j = 0; j < THIRD_INDIRECT_NUM; j++) {
-				phy[f[j / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM)]].p[i + DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM)*(j % (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM))] = bb[j][i];
-			}
-		}
-		//save
-		for (j = 0; j < THIRD_INDIRECT_NUM; j++) {
-			for (i = (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + j - 3)*DATA_BLOCK_SIZE;i < (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + j - 2)*DATA_BLOCK_SIZE;i++) {
-				if (i > num) {
-					flag = 1;
-					break;
+			fseek(ff, PHY_DATA_START + Inodenum[k] * DATA_BLOCK_SIZE, SEEK_SET);
+			fwrite(f2, sizeof(f2), 1, ff);
+			for (p = 0; p < INDIRECT_NUM; p++) {
+				for (i = 0; i < INDIRECT_NUM; i++) {
+					f3[i] = find_super();
+					find_free_inode();
 				}
-				phy[ff[j]].p[i - (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + j - 3)*DATA_BLOCK_SIZE] = buffer[i];
+				fseek(ff, PHY_DATA_START + f2[p] * DATA_BLOCK_SIZE, SEEK_SET);
+				fwrite(f3, sizeof(f3), 1, ff);
+				//save
+				for (j = 0; j < INDIRECT_NUM; j++) {
+					char cbuf[DATA_BLOCK_SIZE] = { 0 };
+					for (i = (DATA_COUNT - 3 + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + k * INDIRECT_NUM * INDIRECT_NUM + p * INDIRECT_NUM + j)*DATA_BLOCK_SIZE; i < (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + k * INDIRECT_NUM * INDIRECT_NUM + p * INDIRECT_NUM - 2 + j) * DATA_BLOCK_SIZE; i++) {
+						if (i > num) {
+							cbuf[i - (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + k * INDIRECT_NUM * INDIRECT_NUM + p * INDIRECT_NUM - 3 + j)*DATA_BLOCK_SIZE] = 0;
+							flag = 1;
+							break;
+						}
+						cbuf[i - (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + k * INDIRECT_NUM * INDIRECT_NUM + p * INDIRECT_NUM - 3 + j)*DATA_BLOCK_SIZE] = buffer[i];
+					}
+					fseek(ff, PHY_DATA_START + f3[j] * DATA_BLOCK_SIZE, SEEK_SET);
+					fwrite(cbuf, sizeof(cbuf), 1, ff);
+					if (flag) break;
+				}
+				if (flag) break;
 			}
 			if (flag) break;
 		}
@@ -1168,12 +1174,8 @@ void show_info()
 	int32_t n_file, n_dir;
 	n_dir = n_file = 0;
 	int32_t i, m, k = 0;
-	for (i = 0;i<PHY_DATA_SIZE;i++)
-	{
-		if (hx_superblock.phydata[i] == 0)
-			k++;
-	}
-	m = PHY_DATA_SIZE - k;
+	m = (hx_superblock.special_stack.bg_number - 1) * BLOCK_GROUP_NUM + BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num;
+	k = PHY_DATA_SIZE - m;
 	printf("\tFree block:\t");
 	printf("%d\n", k);
 	printf("\tAlready used:\t");
@@ -1213,14 +1215,14 @@ void show_info()
 }
 
 //logout
-void logout(FILE *fp)
+void logout()
 {
 	//write system information to file
-	WriteToFile(fp);
+	WriteToFile();
 	login();
 }
 //change user
-int32_t change_user(FILE *fp, char username[])
+int32_t change_user(char username[])
 {
 	char password[USER_PASSWORD_LENGTH];
 	int32_t count;
@@ -1242,7 +1244,7 @@ int32_t change_user(FILE *fp, char username[])
 		return -1;
 	}
 	//write to file
-	WriteToFile(fp);
+	WriteToFile();
 
 	for (count = 0; count < TRY_NUM; count++)
 	{
@@ -1569,7 +1571,7 @@ void h_link(char filename[])
 	{
 		path_tnode(cur_dir, L_Ftree, p);
 		p2 = p->lchild;
-		for (int32_t j = 0;j<200;j++)
+		for (int32_t j = 0;j<SYSTEM_ALLOW_OPEN_COUNT;j++)
 		{
 			if (sys_open_table[j].f_inode == p2->data.dir_inode)
 			{
@@ -1671,8 +1673,6 @@ void h_link(char filename[])
 			p4->data.dir_inode = p2->data.dir_inode;
 			strcpy(p4->data.file_name, p2->data.file_name);
 
-			//file_inode[p2->data.dir_inode].inode_number = -1;		//inode number
-			//clear_inode_del(p2);
 
 			file_inode[p4->data.dir_inode].file_icount++;  //link count add 1
 
@@ -1760,8 +1760,7 @@ void h_link(char filename[])
 	int32_t i = 0;
 	clear_dir(file_dir);
 	Tree_to_dir(i, file_dir, L_Ftree->lchild);
-	FILE *fp1 = new FILE();
-	WriteToFile(fp1);
+	WriteToFile();
 }
 
 //s_link
@@ -2009,8 +2008,7 @@ void s_link(char filename[])
 	int32_t i = 0;
 	clear_dir(file_dir);
 	Tree_to_dir(i, file_dir, L_Ftree->lchild);
-	FILE *fp1 = new FILE();
-	WriteToFile(fp1);
+	WriteToFile();
 }
 
 //do file in array
@@ -2079,8 +2077,7 @@ void rename(char filename[])
 	int32_t i = 0;
 	clear_dir(file_dir);
 	Tree_to_dir(i, file_dir, L_Ftree->lchild);
-	FILE *fp = new FILE();
-	WriteToFile(fp);
+	WriteToFile();
 }
 
 void change_pwd() {
@@ -2136,112 +2133,98 @@ void change_pwd() {
 void c_f(int32_t a, char* buffer) {
 	int32_t b = file_inode[a].file_length, i, j, cnt = 0;
 	if (b < DATA_COUNT - 2) {
+		char cbuf[DATA_BLOCK_SIZE];
 		for (i = 0;i < b;i++) {
-			for (j = 0;j < DATA_BLOCK_SIZE;j++) {
-				if (phy[file_inode[a].file_address[i]].p[j] == 0) return;
-				buffer[cnt++] = phy[file_inode[a].file_address[i]].p[j];
+			fseek(ff, PHY_DATA_START + file_inode[a].file_address[i] * DATA_BLOCK_SIZE, SEEK_SET);
+			fread(cbuf, sizeof(cbuf), 1, ff);
+			for (int t = 0; t < DATA_BLOCK_SIZE; t++) {
+				if (cbuf[t] == 0) break;
+				buffer[cnt++] = cbuf[t];
 			}
 		}
 	}
 	else {
+		char cbuf[DATA_BLOCK_SIZE] = { 0 };
 		for (i = 0;i < DATA_COUNT - 3;i++) {
-			for (j = 0;j < DATA_BLOCK_SIZE;j++) {
-				if (phy[file_inode[a].file_address[i]].p[j] == 0) return;
-				buffer[cnt++] = phy[file_inode[a].file_address[i]].p[j];
+			fseek(ff, PHY_DATA_START + file_inode[a].file_address[i] * DATA_BLOCK_SIZE, SEEK_SET);
+			fread(cbuf, sizeof(cbuf), 1, ff);
+			for (int t = 0; t < DATA_BLOCK_SIZE; t++) {
+				if (cbuf[t] == 0) break;
+				buffer[cnt++] = cbuf[t];
 			}
 		}
 	}
 	if (b >= DATA_COUNT - 2) {
-		int32_t f1[FIRST_INDIRECT_NUM];
-		char b1[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM];
-		for (i = 0;i < DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM;i++) {
-			for (j = 0; j < FIRST_INDIRECT_NUM; j++)
-				b1[j][i] = phy[file_inode[a].file_address[DATA_COUNT - 3]].p[i + (DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM)*(j%FIRST_INDIRECT_NUM)];
-		}
-		for (i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			f1[i] = atoi(b1[i]);
-		}
-		for (i = 0;i < FIRST_INDIRECT_NUM;i++) {
-			for (int32_t j = 0;j < DATA_BLOCK_SIZE;j++) {
-				if (phy[f1[i]].p[j] == 0) return;
-				buffer[cnt++] = phy[f1[i]].p[j];
+		char cbuf[DATA_BLOCK_SIZE] = { 0 };
+		int32_t f1[INDIRECT_NUM] = { 0 };
+		fseek(ff, PHY_DATA_START + file_inode[a].file_address[DATA_COUNT - 3] * DATA_BLOCK_SIZE, SEEK_SET);
+		fread(f1, sizeof(f1), 1, ff);
+		for (i = 0;i < INDIRECT_NUM;i++) {
+			fseek(ff, PHY_DATA_START + f1[i] * DATA_BLOCK_SIZE, SEEK_SET);
+			fread(cbuf, sizeof(cbuf), 1, ff);
+			for (int t = 0; t < DATA_BLOCK_SIZE; t++) {
+				if (cbuf[t] == 0) break;
+				buffer[cnt++] = cbuf[t];
 			}
 		}
 	}
 	if (b >= DATA_COUNT - 1) {
+		char cbuf[DATA_BLOCK_SIZE] = { 0 };
 		//first level indirect addressing 
-		int32_t f1[FIRST_INDIRECT_NUM], i, j;
-		char b1[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM];
-		for (i = 0;i < DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM;i++) {
-			for (j = 0; j < FIRST_INDIRECT_NUM; j++)
-				b1[j][i] = phy[file_inode[a].file_address[DATA_COUNT - 2]].p[i + (DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM)*(j%FIRST_INDIRECT_NUM)];
-		}
-		for (i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			f1[i] = atoi(b1[i]);
-		}
-
+		int32_t f1[INDIRECT_NUM] = { 0 }, i, j;
+		fseek(ff, PHY_DATA_START + file_inode[a].file_address[DATA_COUNT - 2] * DATA_BLOCK_SIZE, SEEK_SET);
+		fread(f1, sizeof(f1), 1, ff);
 		//second level indirect addressing
-		int32_t f2[SECOND_INDIRECT_NUM];
-		char b2[SECOND_INDIRECT_NUM][DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)];
-		for (j = 0;j < DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM);j++) {
-			for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
-				b2[i][j] = phy[f1[i / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)]].p[j + DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM) * (i % (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM))];
+		int32_t f2[INDIRECT_NUM] = { 0 };
+		bool flag = 0;
+		for (i = 0; i < INDIRECT_NUM; i++) {
+			fseek(ff, PHY_DATA_START + f1[i] * DATA_BLOCK_SIZE, SEEK_SET);
+			fread(f2, sizeof(f2), 1, ff);
+			for (j = 0;j < INDIRECT_NUM;j++) {
+				fseek(ff, PHY_DATA_START + f2[j] * DATA_BLOCK_SIZE, SEEK_SET);
+				fread(cbuf, sizeof(cbuf), 1, ff);
+				for (int t = 0; t < DATA_BLOCK_SIZE; t++) {
+					if (cbuf[t] == 0) {
+						flag = 1;
+						break;
+					}
+					buffer[cnt++] = cbuf[t];
+				}
+				if (flag) break;
 			}
-		}
-		for (i = 0;i < SECOND_INDIRECT_NUM;i++) {
-			f2[i] = atoi(b2[i]);
-		}
-
-		for (i = 0;i < SECOND_INDIRECT_NUM;i++) {
-			for (j = 0;j < DATA_BLOCK_SIZE;j++) {
-				if (phy[f2[i]].p[j] == 0) return;
-				buffer[cnt++] = phy[f2[i]].p[j];
-			}
+			if (flag) break;
 		}
 	}
 	if (b >= DATA_COUNT) {
-		//first level indirect addressing
-		int32_t f1[FIRST_INDIRECT_NUM], i, j;
-		char b1[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM];
-		for (i = 0;i < DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM;i++) {
-			for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
-				b1[j][i] = phy[file_inode[a].file_address[DATA_COUNT - 1]].p[i + DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM*(j%FIRST_INDIRECT_NUM)];
+		char cbuf[DATA_BLOCK_SIZE] = { 0 };
+		//first level indirect addressing 
+		int32_t f1[INDIRECT_NUM] = { 0 }, i, j, k;
+		fseek(ff, PHY_DATA_START + file_inode[a].file_address[DATA_COUNT - 1] * DATA_BLOCK_SIZE, SEEK_SET);
+		fread(f1, sizeof(f1), 1, ff);
+		//second level indirect addressing
+		int32_t f2[INDIRECT_NUM] = { 0 }, f3[INDIRECT_NUM] = { 0 };
+		bool flag = 0;
+		for (i = 0; i < INDIRECT_NUM; i++) {
+			fseek(ff, PHY_DATA_START + f1[i] * DATA_BLOCK_SIZE, SEEK_SET);
+			fread(f2, sizeof(f2), 1, ff);
+			for (j = 0;j < INDIRECT_NUM;j++) {
+				fseek(ff, PHY_DATA_START + f2[j] * DATA_BLOCK_SIZE, SEEK_SET);
+				fread(f3, sizeof(f3), 1, ff);
+				for (k = 0;k < INDIRECT_NUM;k++) {
+					fseek(ff, PHY_DATA_START + f3[k] * DATA_BLOCK_SIZE, SEEK_SET);
+					fread(cbuf, sizeof(cbuf), 1, ff);
+					for (int t = 0; t < DATA_BLOCK_SIZE; t++) {
+						if (cbuf[t] == 0) {
+							flag = 1;
+							break;
+						}
+						buffer[cnt++] = cbuf[t];
+					}
+					if (flag) break;
+				}
+				if (flag) break;
 			}
-		}
-		for (i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			f1[i] = atoi(b1[i]);
-		}
-
-		//second level indirect addressing 
-		int32_t f2[SECOND_INDIRECT_NUM];
-		char b2[SECOND_INDIRECT_NUM][DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)];
-		for (j = 0;j < DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM);j++) {
-			for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
-				b2[i][j] = phy[f1[i / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)]].p[j + DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM) * (i % (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM))];
-			}
-		}
-		for (i = 0;i < SECOND_INDIRECT_NUM;i++) {
-			f2[i] = atoi(b2[i]);
-		}
-
-		//third level indirect addressing 
-		int32_t f3[THIRD_INDIRECT_NUM];
-		char b3[THIRD_INDIRECT_NUM][DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM)];
-		for (j = 0;j < DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM);j++) {
-			for (i = 0; i < THIRD_INDIRECT_NUM; i++) {
-				b3[i][j] = phy[f2[i / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM)]].p[j + DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM) * (i % (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM))];
-			}
-		}
-		for (i = 0;i < THIRD_INDIRECT_NUM;i++) {
-			f3[i] = atoi(b3[i]);
-		}
-
-
-		for (i = 0;i < THIRD_INDIRECT_NUM;i++) {
-			for (j = 0;j < DATA_BLOCK_SIZE;j++) {
-				if (phy[f3[i]].p[j] == 0) return;
-				buffer[cnt++] = phy[f3[i]].p[j];
-			}
+			if (flag) break;
 		}
 	}
 }
@@ -2253,7 +2236,6 @@ void wc_f(int32_t a, char* buffer) {  //a:inode number
 	while (buffer[num] != '\0') num++;
 
 	file_inode[a].file_length = 0;
-	if (num == 0) return;
 	if (num > FILE_BUFFER) {
 		printf("The input content out of the size!\n");
 		return;
@@ -2262,20 +2244,27 @@ void wc_f(int32_t a, char* buffer) {  //a:inode number
 		if (num % DATA_BLOCK_SIZE == 0) {
 			for (int32_t i = 0;i < num / DATA_BLOCK_SIZE;i++) {
 				file_inode[a].file_address[i] = find_super();
+				fseek(ff, PHY_DATA_START + find_super()*DATA_BLOCK_SIZE, SEEK_SET);
+				char cbuf[DATA_BLOCK_SIZE] = { 0 };
 				for (int32_t j = 0;j<DATA_BLOCK_SIZE;j++) {
-					phy[find_super()].p[j] = buffer[i * DATA_BLOCK_SIZE + j];
+					cbuf[j] = buffer[i * DATA_BLOCK_SIZE + j];
 				}
-				hx_superblock.phydata[find_super()] = 1;
+				fwrite(cbuf, sizeof(cbuf), 1, ff);
+				find_free_inode();
 				file_inode[a].file_length++;
 			}
 		}
 		else {
 			for (int32_t i = 0;i<num / DATA_BLOCK_SIZE + 1;i++) {
 				file_inode[a].file_address[i] = find_super();
+				fseek(ff, PHY_DATA_START + file_inode[a].file_address[i] * DATA_BLOCK_SIZE, SEEK_SET);
+				char cbuf[DATA_BLOCK_SIZE] = { 0 };
 				for (int32_t j = 0;j<DATA_BLOCK_SIZE;j++) {
-					phy[find_super()].p[j] = buffer[i * DATA_BLOCK_SIZE + j];
+					if (i * DATA_BLOCK_SIZE + j > num) break;
+					cbuf[j] = buffer[i * DATA_BLOCK_SIZE + j];
 				}
-				hx_superblock.phydata[find_super()] = 1;
+				fwrite(cbuf, sizeof(cbuf), 1, ff);
+				find_free_inode();
 				file_inode[a].file_length++;
 			}
 		}
@@ -2283,10 +2272,13 @@ void wc_f(int32_t a, char* buffer) {  //a:inode number
 	else {
 		for (int32_t i = 0;i<DATA_COUNT - 3;i++) {
 			file_inode[a].file_address[i] = find_super();
+			fseek(ff, PHY_DATA_START + file_inode[a].file_address[i] * DATA_BLOCK_SIZE, SEEK_SET);
+			char cbuf[DATA_BLOCK_SIZE] = { 0 };
 			for (int32_t j = 0;j<DATA_BLOCK_SIZE;j++) {
-				phy[find_super()].p[j] = buffer[i * DATA_BLOCK_SIZE + j];
+				cbuf[j] = buffer[i * DATA_BLOCK_SIZE + j];
 			}
-			hx_superblock.phydata[find_super()] = 1;
+			fwrite(cbuf, sizeof(cbuf), 1, ff);
+			find_free_inode();
 			file_inode[a].file_length++;
 		}
 	}
@@ -2294,153 +2286,113 @@ void wc_f(int32_t a, char* buffer) {  //a:inode number
 	if (num>(DATA_COUNT - 3)*DATA_BLOCK_SIZE) {
 		file_inode[a].file_address[DATA_COUNT - 3] = find_super();
 		file_inode[a].file_length++;
-		int32_t Inodenum[FIRST_INDIRECT_NUM];
-		for (int32_t i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			hx_superblock.phydata[find_super()] = 1;
+		int32_t Inodenum[INDIRECT_NUM] = { 0 };
+		for (int32_t i = 0; i < INDIRECT_NUM; i++) {
+			find_free_inode();
 			Inodenum[i] = find_super();
 		}
-		hx_superblock.phydata[find_super()] = 1;
-		char buf[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM] = { 0 };
-		for (int32_t i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			itoa(Inodenum[i], buf[i], DATA_BLOCK_SIZE);
-		}
+		find_free_inode();
 		int32_t i, j;
-		for (i = 0;i < DATA_BLOCK_SIZE; i++) {
-			for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
-				phy[file_inode[a].file_address[DATA_COUNT - 3]].p[i + (DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM) * (j%FIRST_INDIRECT_NUM)] = buf[j][i];
-			}
-		}
+		fseek(ff, PHY_DATA_START + file_inode[a].file_address[DATA_COUNT - 3] * DATA_BLOCK_SIZE, SEEK_SET);
+		fwrite(Inodenum, sizeof(Inodenum), 1, ff);
 		//save
-		for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
+		for (j = 0; j < INDIRECT_NUM; j++) {
+			char cbuf[DATA_BLOCK_SIZE] = { 0 };
 			for (i = (DATA_COUNT - 3 + j)*DATA_BLOCK_SIZE; i < (DATA_COUNT - 2 + j) * DATA_BLOCK_SIZE; i++) {
 				if (i > num) {
+					cbuf[i - (DATA_COUNT - 3 + j)*DATA_BLOCK_SIZE] = 0;
 					flag = 1;
 					break;
 				}
-				phy[Inodenum[j]].p[i - (DATA_COUNT - 3 + j)*DATA_BLOCK_SIZE] = buffer[i];
+				cbuf[i - (DATA_COUNT - 3 + j)*DATA_BLOCK_SIZE] = buffer[i];
 			}
+			fseek(ff, PHY_DATA_START + Inodenum[j] * DATA_BLOCK_SIZE, SEEK_SET);
+			fwrite(cbuf, sizeof(cbuf), 1, ff);
 			if (flag) break;
 		}
 	}
 	if (num>(DATA_COUNT + FIRST_INDIRECT_NUM - 3)*DATA_BLOCK_SIZE) {
 		file_inode[a].file_address[DATA_COUNT - 2] = find_super();
 		file_inode[a].file_length++;
-		int32_t Inodenum[FIRST_INDIRECT_NUM];
-		for (int32_t i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			hx_superblock.phydata[find_super()] = 1;
+		int32_t Inodenum[INDIRECT_NUM] = { 0 };
+		for (int32_t i = 0; i < INDIRECT_NUM; i++) {
+			find_free_inode();
 			Inodenum[i] = find_super();
 		}
-		hx_superblock.phydata[find_super()] = 1;
-		char buf[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM] = { 0 };
-		for (int32_t i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			itoa(Inodenum[i], buf[i], DATA_BLOCK_SIZE);
-		}
-		int32_t i, j;
-		//first
-		for (i = 0;i < DATA_BLOCK_SIZE; i++) {
-			for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
-				phy[file_inode[a].file_address[DATA_COUNT - 2]].p[i + (DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM) * (j%FIRST_INDIRECT_NUM)] = buf[j][i];
-			}
-		}
-		for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
-			for (i = (DATA_COUNT + FIRST_INDIRECT_NUM - 3 + j)* DATA_BLOCK_SIZE; i < (DATA_COUNT + FIRST_INDIRECT_NUM + j - 2) * DATA_BLOCK_SIZE; i++) {
-				phy[Inodenum[j]].p[i - (DATA_COUNT + FIRST_INDIRECT_NUM - 3 + j)*DATA_BLOCK_SIZE] = buffer[i];
-			}
-		}
+		find_free_inode();
+		fseek(ff, PHY_DATA_START + file_inode[a].file_address[DATA_COUNT - 2] * DATA_BLOCK_SIZE, SEEK_SET);
+		fwrite(Inodenum, sizeof(Inodenum), 1, ff);
+		int32_t i, j, k;
 		//second
-		int32_t f[SECOND_INDIRECT_NUM];
-		for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
-			f[i] = find_super();
-			hx_superblock.phydata[f[i]] = 1;
-		}
-		char b[SECOND_INDIRECT_NUM][DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)] = { 0 };
-		for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
-			itoa(f[i], b[i], DATA_BLOCK_SIZE);
-		}
-		for (i = 0;i<DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM));i++) {
-			for (j = 0; j < SECOND_INDIRECT_NUM; j++) {
-				phy[Inodenum[j / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)]].p[i + (j % (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM))*DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)] = b[j][i];
+		int32_t f2[INDIRECT_NUM] = { 0 };
+		for (k = 0; k < INDIRECT_NUM; k++) {
+			for (i = 0; i < INDIRECT_NUM; i++) {
+				f2[i] = find_super();
+				find_free_inode();
 			}
-		}
-		//save
-		for (j = 0; j < SECOND_INDIRECT_NUM; j++) {
-			for (i = (DATA_COUNT + FIRST_INDIRECT_NUM + j - 3)*DATA_BLOCK_SIZE; i < (DATA_COUNT + FIRST_INDIRECT_NUM + j - 2)*DATA_BLOCK_SIZE;i++) {
-				if (i > num) {
-					flag = 1;
-					break;
+			fseek(ff, PHY_DATA_START + Inodenum[k] * DATA_BLOCK_SIZE, SEEK_SET);
+			fwrite(f2, sizeof(f2), 1, ff);
+			//save
+			for (j = 0; j < INDIRECT_NUM; j++) {
+				char cbuf[DATA_BLOCK_SIZE] = { 0 };
+				for (i = (DATA_COUNT - 3 + FIRST_INDIRECT_NUM + k * INDIRECT_NUM + j)*DATA_BLOCK_SIZE; i < (DATA_COUNT + FIRST_INDIRECT_NUM + k * INDIRECT_NUM - 2 + j) * DATA_BLOCK_SIZE; i++) {
+					if (i > num) {
+						cbuf[i - (DATA_COUNT + FIRST_INDIRECT_NUM + k * INDIRECT_NUM - 3 + j)*DATA_BLOCK_SIZE] = 0;
+						flag = 1;
+						break;
+					}
+					cbuf[i - (DATA_COUNT + FIRST_INDIRECT_NUM + k * INDIRECT_NUM - 3 + j)*DATA_BLOCK_SIZE] = buffer[i];
 				}
-				phy[f[j]].p[i - (DATA_COUNT + FIRST_INDIRECT_NUM + j - 3)*DATA_BLOCK_SIZE] = buffer[i];
+				fseek(ff, PHY_DATA_START + f2[j] * DATA_BLOCK_SIZE, SEEK_SET);
+				fwrite(cbuf, sizeof(cbuf), 1, ff);
+				if (flag) break;
 			}
-			if (flag) break;
 		}
 	}
 	if (num>(DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM - 3)*DATA_BLOCK_SIZE) {
 		file_inode[a].file_address[DATA_COUNT - 1] = find_super();
 		file_inode[a].file_length++;
-
-		int32_t Inodenum[FIRST_INDIRECT_NUM];
-		for (int32_t i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			hx_superblock.phydata[find_super()] = 1;
+		int32_t Inodenum[INDIRECT_NUM] = { 0 };
+		for (int32_t i = 0; i < INDIRECT_NUM; i++) {
+			find_free_inode();
 			Inodenum[i] = find_super();
 		}
-		hx_superblock.phydata[find_super()] = 1;
-		char buf[FIRST_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM] = { 0 };
-		for (int32_t i = 0; i < FIRST_INDIRECT_NUM; i++) {
-			itoa(Inodenum[i], buf[i], DATA_BLOCK_SIZE);
-		}
-		int32_t i, j;
-		//first
-		for (i = 0;i < DATA_BLOCK_SIZE; i++) {
-			for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
-				phy[file_inode[a].file_address[DATA_COUNT - 1]].p[i + (DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM) * (j%FIRST_INDIRECT_NUM)] = buf[j][i];
-			}
-		}
-		for (j = 0; j < FIRST_INDIRECT_NUM; j++) {
-			for (i = (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM - 3 + j)* DATA_BLOCK_SIZE; i < (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + j - 2) * DATA_BLOCK_SIZE; i++) {
-				phy[Inodenum[j]].p[i - (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM - 3 + j)*DATA_BLOCK_SIZE] = buffer[i];
-			}
-		}
-
+		find_free_inode();
+		fseek(ff, PHY_DATA_START + file_inode[a].file_address[DATA_COUNT - 1] * DATA_BLOCK_SIZE, SEEK_SET);
+		fwrite(Inodenum, sizeof(Inodenum), 1, ff);
+		int32_t i, j, k, p, q;
 		//second
-		int32_t f[SECOND_INDIRECT_NUM];
-		for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
-			f[i] = find_super();
-			hx_superblock.phydata[f[i]] = 1;
-		}
-		char b[SECOND_INDIRECT_NUM][DATA_BLOCK_SIZE / FIRST_INDIRECT_NUM] = { 0 };
-		//memset(b, 0, sizeof(b));
-		for (i = 0; i < SECOND_INDIRECT_NUM; i++) {
-			itoa(f[i], b[i], DATA_BLOCK_SIZE);
-		}
-		for (i = 0;i<DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM);i++) {
-			for (j = 0; j < SECOND_INDIRECT_NUM; j++) {
-				phy[Inodenum[j / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)]].p[i + (j % (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM))*DATA_BLOCK_SIZE / (SECOND_INDIRECT_NUM / FIRST_INDIRECT_NUM)] = b[j][i];
+		int32_t f2[INDIRECT_NUM] = { 0 }, f3[INDIRECT_NUM];
+		for (k = 0; k < INDIRECT_NUM; k++) {
+			for (i = 0; i < INDIRECT_NUM; i++) {
+				f2[i] = find_super();
+				find_free_inode();
 			}
-		}
-		//third
-		int32_t ff[THIRD_INDIRECT_NUM];
-		for (i = 0; i < THIRD_INDIRECT_NUM; i++) {
-			ff[i] = find_super();
-			hx_superblock.phydata[ff[i]] = 1;
-		}
-		char bb[THIRD_INDIRECT_NUM][DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM)] = { 0 };
-		//memset(bb, 0, sizeof(bb));
-		for (i = 0; i < THIRD_INDIRECT_NUM; i++) {
-			itoa(ff[i], bb[i], DATA_BLOCK_SIZE);
-		}
-		for (i = 0;i < DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM);i++) {
-			for (j = 0; j < THIRD_INDIRECT_NUM; j++) {
-				phy[f[j / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM)]].p[i + DATA_BLOCK_SIZE / (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM)*(j % (THIRD_INDIRECT_NUM / SECOND_INDIRECT_NUM))] = bb[j][i];
-			}
-		}
-		//save
-		for (j = 0; j < THIRD_INDIRECT_NUM; j++) {
-			for (i = (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + j - 3)*DATA_BLOCK_SIZE;i < (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + j - 2)*DATA_BLOCK_SIZE;i++) {
-				if (i > num) {
-					flag = 1;
-					break;
+			fseek(ff, PHY_DATA_START + Inodenum[k] * DATA_BLOCK_SIZE, SEEK_SET);
+			fwrite(f2, sizeof(f2), 1, ff);
+			for (p = 0; p < INDIRECT_NUM; p++) {
+				for (i = 0; i < INDIRECT_NUM; i++) {
+					f3[i] = find_super();
+					find_free_inode();
 				}
-				phy[ff[j]].p[i - (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + j - 3)*DATA_BLOCK_SIZE] = buffer[i];
+				fseek(ff, PHY_DATA_START + f2[p] * DATA_BLOCK_SIZE, SEEK_SET);
+				fwrite(f3, sizeof(f3), 1, ff);
+				//save
+				for (j = 0; j < INDIRECT_NUM; j++) {
+					char cbuf[DATA_BLOCK_SIZE] = { 0 };
+					for (i = (DATA_COUNT - 3 + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + k * INDIRECT_NUM * INDIRECT_NUM + p * INDIRECT_NUM + j)*DATA_BLOCK_SIZE; i < (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + k * INDIRECT_NUM * INDIRECT_NUM + p * INDIRECT_NUM - 2 + j) * DATA_BLOCK_SIZE; i++) {
+						if (i > num) {
+							cbuf[i - (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + k * INDIRECT_NUM * INDIRECT_NUM + p * INDIRECT_NUM - 3 + j)*DATA_BLOCK_SIZE] = 0;
+							flag = 1;
+							break;
+						}
+						cbuf[i - (DATA_COUNT + FIRST_INDIRECT_NUM + SECOND_INDIRECT_NUM + k * INDIRECT_NUM * INDIRECT_NUM + p * INDIRECT_NUM - 3 + j)*DATA_BLOCK_SIZE] = buffer[i];
+					}
+					fseek(ff, PHY_DATA_START + f3[j] * DATA_BLOCK_SIZE, SEEK_SET);
+					fwrite(cbuf, sizeof(cbuf), 1, ff);
+					if (flag) break;
+				}
+				if (flag) break;
 			}
 			if (flag) break;
 		}
@@ -2512,8 +2464,7 @@ void copy_file(char filename[]) {
 			int i = 0;
 			clear_dir(file_dir);
 			Tree_to_dir(i, file_dir, L_Ftree->lchild);
-			FILE *fp = new FILE();
-			WriteToFile(fp);
+			WriteToFile();
 			
 			wc_f(a, buffer);
 		}
@@ -2602,8 +2553,7 @@ void copy_file(char filename[]) {
 			int i = 0;
 			clear_dir(file_dir);
 			Tree_to_dir(i, file_dir, L_Ftree->lchild);
-			FILE *fp = new FILE();
-			WriteToFile(fp);
+			WriteToFile();
 			wc_f(a, buffer);
 		}
 		else {
@@ -2656,8 +2606,7 @@ void copy_file(char filename[]) {
 			int i = 0;
 			clear_dir(file_dir);
 			Tree_to_dir(i, file_dir, L_Ftree->lchild);
-			FILE *fp = new FILE();
-			WriteToFile(fp);
+			WriteToFile();
 			wc_f(a, buffer);
 		}
 		else {
@@ -2709,8 +2658,7 @@ void copy_file(char filename[]) {
 			int i = 0;
 			clear_dir(file_dir);
 			Tree_to_dir(i, file_dir, L_Ftree->lchild);
-			FILE *fp = new FILE();
-			WriteToFile(fp);
+			WriteToFile();
 			wc_f(a, buffer);
 		}
 		else {

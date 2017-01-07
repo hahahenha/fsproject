@@ -47,6 +47,11 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <HeapReserveSize>512000000</HeapReserveSize>
+      <HeapCommitSize>25600</HeapCommitSize>
+      <StackReserveSize>512000000</StackReserveSize>
+      <StackCommitSize>25600</StackCommitSize>
+      <LargeAddressAware>true</LargeAddressAware>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">

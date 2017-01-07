@@ -62,7 +62,6 @@ typedef struct{
 typedef struct{ 
   	block_group special_stack;  //special stack
   	block_group memory[BLOCK_GROUP_SIZE];	//information of all blocks
-	char phydata[PHY_DATA_SIZE];		//allocation of datas
 	char inode_info[INODES_COUNT];		//allocation of inodes
 	char dir_info[DIR_COUNT];			//allocation of directories
 	int32_t number_inode;           //number of free inode blocks
@@ -93,13 +92,6 @@ typedef struct{
 	char file_name[FILE_NAME_LENGTH];		//file name
 	int32_t  dir_inode;			//inode number(start from 0)
 } dir;
-
-/**
-*	Data block Information
-*/
-typedef struct{
-	char p[DATA_BLOCK_SIZE];
-} physicalBlock;	
 
 /**
 *	System open table Information

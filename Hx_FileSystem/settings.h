@@ -85,16 +85,15 @@
 #define SYSTEM_ALLOW_OPEN_COUNT 200
 /*
 *						File related
-*	First bit:	The type of inode(0 stands for a directory, 1 stands for a file.).
-*	Second bit:	Write permission for the user.
-*	Third bit:	Read permissions for the user.
-*	Forth bit:	Executable permissions for the user.
-*	Fifth bit:	Write permission for the user group.
-*	Sixth bit:	Read permissions for the users group.
-*	Seventh bit:Executable permissions for the users group.
-*	Eight bit:	Write permission for other users.
-*	Nint32_th bit:	Read permissions for other users.
-*	Tenth bit:	Executable permissions for other users.
+*	First bit:	Write permission for the user.
+*	Second bit:	Read permissions for the user.
+*	Third bit:	Executable permissions for the user.
+*	Forth bit:	Write permission for the user group.
+*	Fifth bit:	Read permissions for the users group.
+*	Sixth bit:	Executable permissions for the users group.
+*	Seventh bit:Write permission for other users.
+*	Eight bit:	Read permissions for other users.
+*	Nineth bit:	Executable permissions for other users.
 */
 #define PERMISSIONS 9
 /*
@@ -153,3 +152,7 @@
 *	Try username & password times number
 */
 #define TRY_NUM 5
+
+#define PHY_DATA_START (long)(sizeof(super_block)+INODES_COUNT*sizeof(inode)+DIR_COUNT*sizeof(dir))
+
+#define INDIRECT_NUM (DATA_BLOCK_SIZE / sizeof(int32_t))

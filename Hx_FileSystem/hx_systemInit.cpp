@@ -14,11 +14,10 @@ extern SqStack cur_dir;     		//current directory
 extern Sys_cmd cmd[COM_NUM];				//23 commands
 extern usernote L_user[USER_COUNT];			//users array
 extern int32_t f_inode;					//current active inode number
-
+extern FILE *ff;					//disk
 extern super_block hx_superblock;   //super block
 extern inode file_inode[INODES_COUNT];		//inode
 extern dir file_dir[DIR_COUNT];			//directory
-extern physicalBlock phy[PHY_DATA_SIZE];	//data
 
 
 extern  UserOpenTable user_open_table[USER_ALLOW_OPEN_COUNT];	//user open table
@@ -28,18 +27,18 @@ extern ActiveNode active_inode_table;		//active inode table
 extern FTreepoint L_Ftree;                 //file tree
 
 //File operating
-void ReadFromFile(FILE *fp);	//read file
-void WriteToFile(FILE *fp);		//write file
-void ReadUsers();		//get users
+void ReadFromFile();	//read file
+void WriteToFile();		//write file
+void ReadUsers(FILE *fp);		//get users
 void SaveUsers();		//save users
-
+extern FILE *ff;					//disk
 //Init function
-void InitSystem(FILE *fp);		//Init system
+void InitSystem();		//Init system
 void InitDisks();				//Init disk
 void InitUsers();				//Init users
 void InitTable();				//Init table
 void InitCommand();				//Init command
-void shell(FILE *fp);			//Init shell
+void shell();			//Init shell
 
 //cmd
 int32_t login();					//login function
@@ -57,8 +56,8 @@ void close_file(char tmp[]);	//close a file
 void delete_file(char tmp[]);	//delete a file
 void copy_file(char tmp[]);		//copy a file
 void show_info();				//show system information
-void logout(FILE *fp);			//logout
-int32_t change_user(FILE *fp, char tmp[]);	//change user
+void logout();			//logout
+int32_t change_user(char tmp[]);	//change user
 void change_mode(char tmp[]);	//chang file mode
 void change_owner(char filename[]);//change file owner
 void change_group(char filename[]);//change file group
@@ -80,8 +79,8 @@ void InitfileTree(FTreepoint &T);    //Init file tree
 
 
 //system start
-void Sys_start(FILE *fp){
-	InitSystem(fp);     //Init system
+void Sys_start(){
+	InitSystem();     //Init system
 
 	printf("\t\t\t\t**************************************************************\n");
 	printf("\t\t\t\t*                                                            *\n");
@@ -104,19 +103,22 @@ void Sys_start(FILE *fp){
 
 
 //Init system, if file does not existed, create a new file
-void InitSystem(FILE *fp){
+void InitSystem(){
 	//read file
-	if (fp == NULL)
+	FILE *fp = fopen(DISK_NAME, "rb");
+	if (fp == NULL) {
 		InitDisks();		//Init the disk
-	else
-		ReadFromFile(fp);   //read disk
+	}
+	else {
+		ReadFromFile();   //read disk
+	}
 	InitTable();			//Init file table
 	InitCommand();
 	InitStack(cur_dir);      //Init stack path
 	push(cur_dir, "root");
 	InitfileTree(L_Ftree);
 	InitUsers();			//Init users
-	WriteToFile(fp);
+	WriteToFile();
 }
 
 //Init command
@@ -150,7 +152,7 @@ void InitCommand(){
 }
 
 //Shell
-void shell(FILE *fp){
+void shell(){
 	int32_t i, p;				//p: command number
 	char com[CMD_LENGTH], tmp[2*CMD_LENGTH];  //com: current command, tmp: parameter
 	while (1){
@@ -171,7 +173,7 @@ void shell(FILE *fp){
 				p = COM_NUM;
 			}
 			switch (p) {
-			case 0: WriteToFile(fp);return;     //shut down
+			case 0: WriteToFile();fclose(ff);return;     //shut down
 			case 1: help();break;				//help
 			case 2: show_curdir();break;		//show current directory content
 			case 3: scanf("%s", tmp);go_dir(tmp);break;//jump to the directory given
@@ -185,9 +187,9 @@ void shell(FILE *fp){
 			case 11: scanf("%s", tmp);close_file(tmp);break;	//close the file
 			case 12: scanf("%s", tmp);delete_file(tmp);break;	//remove a file
 			case 13: show_info();break;			//show system information
-			case 14: logout(fp);break;			//logout
+			case 14: logout();break;			//logout
 			case 15: scanf("%s", tmp);			//change user
-				if (change_user(fp, tmp))
+				if (change_user(tmp))
 					break;
 				else
 					return;
@@ -218,8 +220,6 @@ void InitDisks(){
 		hx_superblock.inode_info[i] = 0;
 		hx_superblock.dir_info[i] = 0;
 	}
-	for (i = 0;i<PHY_DATA_SIZE;i++)
-		hx_superblock.phydata[i] = 0;
 	//Init super block
 	hx_superblock.special_stack.bg_number=1;
 	hx_superblock.special_stack.free_num= BLOCK_GROUP_NUM;
@@ -263,11 +263,6 @@ void InitDisks(){
 		strcpy(file_dir[i].file_name, "");   //file name
 		file_dir[i].dir_inode = -1;          //file inode
 	}
-	//Init data blocks
-	for (i = 0;i<PHY_DATA_SIZE;i++)
-		for (j = 0;j<DATA_BLOCK_SIZE;j++)
-			phy[i].p[j] = -1;
-
 }
 
 //Init users
@@ -288,15 +283,16 @@ void InitUsers()
 			L_user[i].group = -1;
 			L_user[i].level = -1;
 		}
-
+		ff = fopen(DISK_NAME, "wb+");		//read from disk
 		create_file("pw");
 		SaveUsers();
 	}
 	else
 	{
 		//读出系统用户
-		ReadUsers();
+		ReadUsers(fps);
 		fclose(fps);
+		ff = fopen(DISK_NAME, "rb+");
 	}
 
 }

@@ -14,11 +14,10 @@ extern SqStack cur_dir;     		//current directory
 extern Sys_cmd cmd[COM_NUM];				//23 commands
 extern usernote L_user[USER_COUNT];			//users array
 extern int32_t f_inode;					//current active inode number
-
+extern FILE *ff;					//disk
 extern super_block hx_superblock;   //super block
 extern inode file_inode[INODES_COUNT];		//inode
 extern dir file_dir[DIR_COUNT];			//directory
-extern physicalBlock phy[PHY_DATA_SIZE];	//data
 
 extern  UserOpenTable user_open_table[USER_ALLOW_OPEN_COUNT];	//user open table
 extern SystemOpenTable sys_open_table[SYSTEM_ALLOW_OPEN_COUNT];	//system open table
@@ -43,7 +42,6 @@ int32_t find_free_inode(){
 		hx_superblock.special_stack.free_num--;
 		hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 1;
 		return hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number;
-		
 	}
 	else {
 		while (hx_superblock.special_stack.free_num <= 0) {
