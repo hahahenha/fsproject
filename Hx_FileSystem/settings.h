@@ -66,11 +66,7 @@
 /*
 *	The maximum deep of free inode stack.
 */
-#define FREE_INODE_STACK_SIZE 50
-/*
-*	The number of data blocks.
-*/
-#define DATA_BLOCKS_COUNT 120				
+#define FREE_INODE_STACK_SIZE 50			
 /*
 *	The maximum number of the file system users.
 */

@@ -38,18 +38,10 @@ int32_t find_path(SqStack S);   //get the path
 
 
 int32_t find_free_inode(){
-	if (hx_superblock.special_stack.free_num > 0) {
-		hx_superblock.special_stack.free_num--;
-		hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].flag = 1;
-		return hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number;
-	}
-	else {
-		while (hx_superblock.special_stack.free_num <= 0) {
-			hx_superblock.special_stack = hx_superblock.memory[hx_superblock.special_stack.next];
+	for (int i = 0;i<INODES_COUNT;i++) {
+		if (file_inode[i].inode_number == -1) {
+			return i;
 		}
-		hx_superblock.special_stack.free_num = 49;
-		hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.bg_number].flag = 1;
-		return hx_superblock.special_stack.free[BLOCK_GROUP_NUM - hx_superblock.special_stack.free_num].b_number;
 	}
 	printf(E3);return -1;
 }
